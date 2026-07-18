@@ -245,7 +245,9 @@ export default async function handler(req: any, res: any) {
     return
   }
 
-  const supabase = createClient(process.env.VITE_SUPABASE_URL as string, process.env.VITE_SUPABASE_ANON_KEY as string)
+  // service_role, não anon: o bot é backend confiável e precisa escrever mesmo com o
+  // banco trancado para authenticated (RLS não se aplica à service_role).
+  const supabase = createClient(process.env.VITE_SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string)
   const normalized = normalize(text)
 
   const amount = extractAmount(text)

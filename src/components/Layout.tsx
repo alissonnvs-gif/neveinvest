@@ -7,6 +7,7 @@ interface Props {
   onChange: (t: Tab) => void
   children: ReactNode
   draftsCount?: number
+  onLogout?: () => void
 }
 
 const tabs: { id: Tab; label: string; icon: string }[] = [
@@ -18,7 +19,7 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'configuracoes', label: 'Config', icon: '⚙️' },
 ]
 
-export default function Layout({ active, onChange, children, draftsCount = 0 }: Props) {
+export default function Layout({ active, onChange, children, draftsCount = 0, onLogout }: Props) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-slate-900 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
@@ -26,9 +27,16 @@ export default function Layout({ active, onChange, children, draftsCount = 0 }: 
           <span className="text-2xl">🏦</span>
           <span className="font-bold text-lg text-emerald-400">NeveInvest</span>
         </div>
-        <span className="text-xs text-slate-400">
-          {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">
+            {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+          </span>
+          {onLogout && (
+            <button onClick={onLogout} className="text-xs text-slate-500 hover:text-red-400" title="Sair">
+              🚪 Sair
+            </button>
+          )}
+        </div>
       </header>
 
       <nav className="bg-slate-800 border-b border-slate-700 flex">
