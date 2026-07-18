@@ -23,7 +23,7 @@ function buildPrompt(state: AppState): string {
 
   const totalInvested = state.investments.reduce((s, i) => s + i.currentValue, 0)
   const target = state.annualGoal.targetValue
-  const goalPct = ((totalInvested / target) * 100).toFixed(1)
+  const goalPct = (target > 0 ? (totalInvested / target) * 100 : 0).toFixed(1)
 
   const last3Records = state.investmentRecords.slice(-3)
   const avgMonthlyReturn = last3Records.length > 0

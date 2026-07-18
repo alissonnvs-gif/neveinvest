@@ -125,9 +125,17 @@ function extractInstallments(text: string): number {
   return n >= 2 && n <= 12 ? n : 1
 }
 
+// Acha um keyword respeitando limite de palavra (\b) — evita falso positivo tipo "Gastei"
+// batendo com a keyword solta "gas" (Casa) só por conter a substring, sem ser a palavra inteira.
+function wordIndex(haystack: string, needle: string): number {
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = haystack.match(new RegExp(`\\b${escaped}\\b`))
+  return match ? (match.index ?? -1) : -1
+}
+
 function guessCategory(normalized: string): string {
   for (const [category, keywords] of CATEGORY_KEYWORDS) {
-    if (keywords.some((k) => normalized.includes(normalize(k)))) return category
+    if (keywords.some((k) => wordIndex(normalized, normalize(k)) !== -1)) return category
   }
   return 'Outros'
 }
@@ -139,14 +147,14 @@ function matchMethod(normalized: string): { method: string; keywordEnd: number }
   for (const [method, keywords] of METHOD_KEYWORDS) {
     for (const k of keywords) {
       const nk = normalize(k)
-      const idx = normalized.indexOf(nk)
+      const idx = wordIndex(normalized, nk)
       if (idx !== -1) return { method, keywordEnd: idx + nk.length }
     }
   }
   // Frases genéricas de cartão sem especificar qual — assume o cartão padrão. Frase mais longa
   // primeiro, pra consumir "cartão de crédito" inteiro em vez de parar só em "cartão".
   for (const generic of ['cartao de credito', 'cartao', 'credito']) {
-    const idx = normalized.indexOf(generic)
+    const idx = wordIndex(normalized, generic)
     if (idx !== -1) return { method: DEFAULT_CARD_METHOD, keywordEnd: idx + generic.length }
   }
   return null
@@ -183,13 +191,24 @@ function guessDescriptionAfterMethod(rawText: string, keywordEnd: number, amount
   return desc.charAt(0).toUpperCase() + desc.slice(1)
 }
 
+// Nunca deixa uma falha silenciosa aqui: se o Telegram rejeitar o envio (chat_id errado, bot
+// removido do grupo, etc.), isso precisa aparecer nos logs da Vercel — senão o usuário nunca
+// recebe feedback nenhum e não dá pra saber se o lançamento foi ou não confirmado.
 async function sendTelegramMessage(chatId: number, text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  })
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    })
+    if (!response.ok) {
+      const body = await response.text()
+      console.error(`[telegram] falha ao enviar mensagem (${response.status}):`, body)
+    }
+  } catch (err) {
+    console.error('[telegram] erro de rede ao enviar mensagem:', err)
+  }
 }
 
 export default async function handler(req: any, res: any) {

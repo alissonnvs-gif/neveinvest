@@ -148,7 +148,7 @@ export default function Gastos() {
     .filter((e) => e.method === 'cartao_beneficio' && e.date.slice(0, 7) === today)
     .reduce((s, e) => s + e.amount, 0)
   // Medidor: saldo atual como fração de uma recarga mensal (não é "% usado", é "quanto sobrou")
-  const benefitPct = Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100))
+  const benefitPct = benefitCardMonthlyAmount > 0 ? Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100)) : 0
 
   const byCategory = CATEGORIES.map((cat) => ({
     name: cat,

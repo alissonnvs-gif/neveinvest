@@ -70,42 +70,28 @@ function migrateIncomes(rawIncomes: any[]): { incomes: Income[]; receipts: Incom
   return { incomes: [...alreadyMigrated, ...migrated], receipts }
 }
 
+// Estado inicial em branco — a família preenche tudo pela própria plataforma (Configurações,
+// Investimentos, Gastos). Nada de dados de exemplo pré-cadastrados.
 const defaultState: AppState = {
   expenses: [],
-  budgets: [{ month: CURRENT_MONTH, limit: 8000, income: 22100 }],
-  incomes: [
-    { id: '1', startMonth: CURRENT_MONTH, description: 'Salário CLT', amount: 13000, type: 'fixo' },
-    { id: '2', startMonth: CURRENT_MONTH, description: 'Bolsa de Pesquisa', amount: 6000, type: 'fixo' },
-    { id: '3', startMonth: CURRENT_MONTH, description: 'Vale Alimentação', amount: 3100, type: 'fixo' },
-  ],
+  budgets: [{ month: CURRENT_MONTH, limit: 0, income: 0 }],
+  incomes: [],
   incomeReceipts: [],
-  investments: [
-    { id: 'inv1', name: 'CDB', type: 'CDB', currentValue: 99500, initialValue: 99500, startDate: '2026-01-01' },
-  ],
+  investments: [],
   investmentRecords: [],
   aportes: [],
   annualGoal: {
     year: CURRENT_YEAR,
-    targetValue: 500000,
-    judicialExpected: 350000,
-    judicialProbability: 70,
+    targetValue: 0,
+    judicialExpected: 0,
+    judicialProbability: 0,
   },
-  extraordinaryIncomes: [
-    {
-      id: 'ei1',
-      description: 'Processo Judicial — Venda da Casa',
-      amount: 350000,
-      expectedDate: '2026-10',
-      probability: 70,
-      received: false,
-      type: 'judicial',
-    },
-  ],
+  extraordinaryIncomes: [],
   fixedCosts: [],
   fixedCostPayments: [],
   cardBillPayments: [],
   dailyInsights: null,
-  benefitCardMonthlyAmount: 3100,
+  benefitCardMonthlyAmount: 0,
   benefitCardCredits: [],
 }
 

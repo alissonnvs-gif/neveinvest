@@ -162,7 +162,7 @@ export default function Investimentos() {
       {/* Meta */}
       <div className="bg-slate-800 rounded-xl p-4">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold text-slate-200">Meta 2026: {fmt(annualGoal.targetValue)}</h2>
+          <h2 className="font-semibold text-slate-200">Meta {annualGoal.year}: {fmt(annualGoal.targetValue)}</h2>
           <button onClick={() => setEditMeta(!editMeta)} className="text-xs text-emerald-400 hover:text-emerald-300">
             {editMeta ? 'Cancelar' : 'Editar'}
           </button>
@@ -185,7 +185,7 @@ export default function Investimentos() {
           </div>
         )}
         <div className="h-4 bg-slate-700 rounded-full overflow-hidden mb-3">
-          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${Math.min((totalInvested / annualGoal.targetValue) * 100, 100)}%` }} />
+          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${annualGoal.targetValue > 0 ? Math.min((totalInvested / annualGoal.targetValue) * 100, 100) : 0}%` }} />
         </div>
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="bg-slate-700 rounded p-2 text-center">

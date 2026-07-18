@@ -47,7 +47,7 @@ export default function Dashboard() {
     .filter((e) => e.method === 'cartao_beneficio' && e.date.slice(0, 7) === month)
     .reduce((s, e) => s + e.amount, 0)
   // Medidor: saldo atual como fração de uma recarga mensal (não é "% usado", é "quanto sobrou")
-  const benefitPct = Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100))
+  const benefitPct = benefitCardMonthlyAmount > 0 ? Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100)) : 0
 
   // Meta de gastos: mesmo valor das faturas exibidas (líquido de pagamentos)
   const cardSpentOpen = cardSpent
@@ -59,7 +59,7 @@ export default function Dashboard() {
 
   const totalInvested = investments.reduce((s, i) => s + i.currentValue, 0)
   const target = annualGoal.targetValue
-  const goalPct = Math.min((totalInvested / target) * 100, 100)
+  const goalPct = target > 0 ? Math.min((totalInvested / target) * 100, 100) : 0
 
   const months = monthsRemaining()
   const extraWeighted = (extraordinaryIncomes ?? [])
@@ -79,7 +79,7 @@ export default function Dashboard() {
     ? last6Aportes.reduce((s, a) => s + a.amount, 0) / last6Aportes.length
     : 0
   const projectedValue = totalInvested + (avgMonthlyAporte + avgMonthlyReturn) * months
-  const projectedPct = Math.min((projectedValue / target) * 100, 100)
+  const projectedPct = target > 0 ? Math.min((projectedValue / target) * 100, 100) : 0
 
   // Jornada mensal da carteira (histórico real + projeção futura + benchmarks CDI/Poupança)
   const allMonths = Array.from({ length: 12 }, (_, i) => {
@@ -177,7 +177,7 @@ export default function Dashboard() {
       <div className="bg-slate-800 rounded-xl p-5">
         <div className="flex items-center justify-between mb-1">
           <div>
-            <h2 className="font-bold text-base text-slate-100">🎯 Missão: R$ 500.000 até Dez/2026</h2>
+            <h2 className="font-bold text-base text-slate-100">🎯 Missão: {fmt(target)} até Dez/{annualGoal.year}</h2>
             <p className="text-xs text-slate-400 mt-0.5">Cada mês conta. Todo aporte te aproxima.</p>
           </div>
           <div className="text-right">
