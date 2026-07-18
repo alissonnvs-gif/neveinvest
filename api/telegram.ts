@@ -252,11 +252,13 @@ export default async function handler(req: any, res: any) {
   if (amount === null) {
     if (normalized.includes(FATURA_QUERY_KEYWORD)) {
       const { data, error: stateError } = await supabase.from('family_state').select('state').eq('id', 'neveinvest').single()
-      if (stateError || !data) {
+      // PGRST116 = nenhuma linha ainda (ninguém lançou nada no app pela primeira vez) — não é erro,
+      // trata como carteira vazia. Só um erro de verdade (ex: banco fora do ar) vira mensagem de falha.
+      if (stateError && stateError.code !== 'PGRST116') {
         console.error('[telegram] erro ao buscar estado para consulta de fatura:', stateError)
         await sendTelegramMessage(chatId, 'Deu erro ao consultar a fatura. Tenta de novo em instantes.')
       } else {
-        const expenses = ((data.state as any)?.expenses ?? []) as { method: string; month: string; amount: number }[]
+        const expenses = ((data?.state as any)?.expenses ?? []) as { method: string; month: string; amount: number }[]
         await sendTelegramMessage(chatId, describeFaturas(expenses))
       }
     }
