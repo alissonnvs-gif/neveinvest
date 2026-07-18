@@ -1,4 +1,6 @@
-export type PaymentMethod = 'cartao_xp' | 'cartao_mp' | 'fatura_xp' | 'fatura_mp' | 'pix' | 'dinheiro' | 'boleto' | 'cartao_beneficio'
+import type { CardId } from './config/cards'
+
+export type PaymentMethod = `cartao_${CardId}` | `fatura_${CardId}` | 'pix' | 'dinheiro' | 'boleto' | 'cartao_beneficio'
 
 export interface BenefitCardCredit {
   id: string
@@ -9,7 +11,7 @@ export interface BenefitCardCredit {
 
 export interface CardBillPayment {
   id: string
-  card: 'xp' | 'mp'
+  card: CardId
   amount: number
   date: string // YYYY-MM-DD
   month: string // YYYY-MM — mês em que o pagamento foi feito

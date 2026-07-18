@@ -1,7 +1,7 @@
 import { useStore } from '../store'
 import InsightsCard from './InsightsCard'
 import CardSpendGoal from './CardSpendGoal'
-import { fmt, fmtPct, currentMonth, monthLabel, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, computeBenefitBalance, CARD_SPEND_METHODS, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
+import { fmt, fmtPct, currentMonth, monthLabel, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, computeBenefitBalance, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
 import {
   AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, ComposedChart,
@@ -16,30 +16,29 @@ export default function Dashboard() {
   const month = currentMonth()
   const budget = [...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]
   const monthExpenses = expenses.filter((e) => e.month === month)
-  // Gastos efetivos do mês: tudo exceto lançamentos de cartão (cartao_xp/mp)
+  // Gastos efetivos do mês: tudo exceto lançamentos de cartão de crédito
   const totalSpent = monthExpenses
     .filter((e) => !CARD_SPEND_METHODS.includes(e.method))
     .reduce((s, e) => s + e.amount, 0)
   // Fatura ABERTA de cada cartão (a que está acumulando compras agora, baseada só na data de hoje
   // e no dia de fechamento — não espera a fatura anterior ser paga para "virar")
-  const fMXP = nextFaturaMonth('xp')
-  const fMMP = nextFaturaMonth('mp')
+  const cardOpenFaturas = CARDS.map((c) => ({ card: c, month: nextFaturaMonth(c.id) }))
   // Mês de referência exibido no card de meta (mesma lógica da aba Gastos): a fatura aberta mais antiga
-  const cardMonth = fMXP < fMMP ? fMXP : fMMP
+  const cardMonth = cardOpenFaturas.map((f) => f.month).sort()[0]
   // Fatura ANTERIOR já fechada mas ainda não paga (se houver), para avisar separadamente
-  const overdueXP = overdueFaturaMonth(expenses, 'xp')
-  const overdueMP = overdueFaturaMonth(expenses, 'mp')
-  const overdueXPAmount = overdueXP ? faturaOpenAmount(expenses, 'xp', overdueXP) : 0
-  const overdueMPAmount = overdueMP ? faturaOpenAmount(expenses, 'mp', overdueMP) : 0
-  const faturaXP = Math.max(0,
-    expenses.filter((e) => e.method === 'cartao_xp' && e.month === fMXP).reduce((s, e) => s + e.amount, 0)
-    - expenses.filter((e) => e.method === 'fatura_xp' && e.month === fMXP).reduce((s, e) => s + e.amount, 0)
-  )
-  const faturaMP = Math.max(0,
-    expenses.filter((e) => e.method === 'cartao_mp' && e.month === fMMP).reduce((s, e) => s + e.amount, 0)
-    - expenses.filter((e) => e.method === 'fatura_mp' && e.month === fMMP).reduce((s, e) => s + e.amount, 0)
-  )
-  const cardSpent = faturaXP + faturaMP
+  const overdueCards = CARDS.map((c) => {
+    const month = overdueFaturaMonth(expenses, c.id)
+    return { card: c, month, amount: month ? faturaOpenAmount(expenses, c.id, month) : 0 }
+  }).filter((o) => o.month)
+  const cardFaturas = cardOpenFaturas.map(({ card, month }) => ({
+    card,
+    month,
+    amount: Math.max(0,
+      expenses.filter((e) => e.method === cardMethod(card.id) && e.month === month).reduce((s, e) => s + e.amount, 0)
+      - expenses.filter((e) => e.method === `fatura_${card.id}` && e.month === month).reduce((s, e) => s + e.amount, 0)
+    ),
+  }))
+  const cardSpent = cardFaturas.reduce((s, f) => s + f.amount, 0)
 
   // Cartão Benefício — saldo contínuo (recarrega e debita, sem fechamento/vencimento mensal)
   const hasBenefitHistory = (benefitCardCredits ?? []).length > 0
@@ -51,9 +50,9 @@ export default function Dashboard() {
   const benefitPct = Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100))
 
   // Meta de gastos: mesmo valor das faturas exibidas (líquido de pagamentos)
-  const cardSpentOpen = faturaXP + faturaMP
+  const cardSpentOpen = cardSpent
   const cardWeeklySpent = weeklyBuckets(
-    expenses.filter((e) => (e.method === 'cartao_xp' && e.month === fMXP) || (e.method === 'cartao_mp' && e.month === fMMP))
+    expenses.filter((e) => cardFaturas.some((f) => e.method === cardMethod(f.card.id) && e.month === f.month))
   )
   const saldo = computeSaldo({ incomeReceipts: incomeReceipts ?? [], extraordinaryIncomes: extraordinaryIncomes ?? [], expenses, aportes: aportes ?? [] })
   const limit = budget?.limit ?? 8000
@@ -120,7 +119,7 @@ export default function Dashboard() {
     }
   })
 
-  // Gastos no cartão por semana — acompanha a fatura aberta (fMXP/fMMP), não o mês calendário:
+  // Gastos no cartão por semana — acompanha a fatura aberta de cada cartão, não o mês calendário:
   // mostra os gastos feitos até agora que caem na fatura que vai vencer em breve.
   const weeklySpending = [1, 2, 3, 4].map((w) => {
     const start = (w - 1) * 7 + 1
@@ -128,7 +127,7 @@ export default function Dashboard() {
     const total = expenses.filter((e) => {
       const day = parseInt(e.date.slice(8, 10))
       return day >= start && day <= end
-        && ((e.method === 'cartao_xp' && e.month === fMXP) || (e.method === 'cartao_mp' && e.month === fMMP))
+        && cardFaturas.some((f) => e.method === cardMethod(f.card.id) && e.month === f.month)
     }).reduce((s, e) => s + e.amount, 0)
     return { name: `Sem ${w}`, gasto: total, meta: limit / 4 }
   })
@@ -137,8 +136,8 @@ export default function Dashboard() {
   const todayWeek = todayDay <= 7 ? 1 : todayDay <= 14 ? 2 : todayDay <= 21 ? 3 : 4
 
   // Por método
-  const byMethod = ['cartao_xp', 'cartao_mp', 'pix', 'dinheiro', 'boleto'].map((method) => ({
-    name: method === 'cartao_xp' ? 'Cartão XP' : method === 'cartao_mp' ? 'Mercado Pago' : method === 'pix' ? 'Pix' : method === 'dinheiro' ? 'Dinheiro' : 'Boleto',
+  const byMethod = [...CARDS.map((c) => ({ method: cardMethod(c.id), name: c.label })), { method: 'pix', name: 'Pix' }, { method: 'dinheiro', name: 'Dinheiro' }, { method: 'boleto', name: 'Boleto' }].map(({ method, name }) => ({
+    name,
     value: monthExpenses.filter((e) => e.method === method).reduce((s, e) => s + e.amount, 0),
   })).filter((d) => d.value > 0)
 
@@ -312,10 +311,11 @@ export default function Dashboard() {
       </div>
 
       {/* Aviso: fatura já fechada (não aceita mais compras) mas ainda não paga */}
-      {(overdueXP || overdueMP) && (
+      {overdueCards.length > 0 && (
         <div className="bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2 text-xs text-amber-300 space-y-1">
-          {overdueXP && <div>⚠️ Fatura XP de {monthLabel(overdueXP)} fechada, aguardando pagamento — {fmt(overdueXPAmount)}</div>}
-          {overdueMP && <div>⚠️ Fatura Mercado Pago de {monthLabel(overdueMP)} fechada, aguardando pagamento — {fmt(overdueMPAmount)}</div>}
+          {overdueCards.map((o) => (
+            <div key={o.card.id}>⚠️ Fatura {o.card.label} de {monthLabel(o.month!)} fechada, aguardando pagamento — {fmt(o.amount)}</div>
+          ))}
         </div>
       )}
 
@@ -358,7 +358,7 @@ export default function Dashboard() {
       {/* Gastos por semana — fatura aberta (mesma referência do card de meta acima) */}
       <div className="bg-slate-800 rounded-xl p-4">
         <h2 className="font-semibold mb-1 text-slate-200">Gastos no Cartão por semana — {monthLabel(cardMonth)}</h2>
-        <p className="text-xs text-slate-500 mb-3">XP + Mercado Pago · meta ÷ 4 ({fmt(limit / 4)}/semana)</p>
+        <p className="text-xs text-slate-500 mb-3">{CARDS.map((c) => c.label).join(' + ')} · meta ÷ 4 ({fmt(limit / 4)}/semana)</p>
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={weeklySpending}>
             <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { fetchPendingDrafts, resolveDraft, type TelegramDraft } from '../lib/supabase'
-import { getFaturaMonth, addMonths } from '../utils'
-import { CATEGORIES, METHODS, CARD_METHODS } from './Gastos'
+import { getFaturaMonth, addMonths, CARD_METHODS, cardIdFromMethod } from '../utils'
+import { CATEGORIES, METHODS } from './Gastos'
 import type { Expense, PaymentMethod } from '../types'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
 
@@ -32,8 +32,8 @@ function toForm(d: TelegramDraft): DraftForm {
 // installmentGroup quando for cartão e installments > 1, senão um único lançamento.
 // Mesma lógica de divisão usada no formulário manual (Gastos.tsx).
 function launchExpense(addExpense: (e: Omit<Expense, 'id'>) => void, form: DraftForm, amount: number) {
-  const isCard = CARD_METHODS.includes(form.method)
-  const card = form.method === 'cartao_xp' ? 'xp' : 'mp'
+  const isCard = CARD_METHODS.includes(form.method as any)
+  const card = cardIdFromMethod(form.method)
   const numInstallments = isCard ? Math.max(1, parseInt(form.installments) || 1) : 1
 
   if (isCard && numInstallments > 1) {
@@ -161,7 +161,7 @@ export default function Rascunhos() {
 
   const openDraft = sorted.find((d) => d.id === openId) ?? null
   const openForm = openDraft ? forms[openDraft.id] : null
-  const isCardMethod = openForm ? CARD_METHODS.includes(openForm.method) : false
+  const isCardMethod = openForm ? CARD_METHODS.includes(openForm.method as any) : false
   const busy = openDraft ? busyId === openDraft.id : false
 
   return (
@@ -325,7 +325,7 @@ export default function Rascunhos() {
 
               {isCardMethod && (
                 <div className="text-xs text-amber-300 bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2">
-                  Vai para a fatura de {getFaturaMonth(openForm.date, openForm.method === 'cartao_xp' ? 'xp' : 'mp')}.
+                  Vai para a fatura de {getFaturaMonth(openForm.date, cardIdFromMethod(openForm.method))}.
                 </div>
               )}
 

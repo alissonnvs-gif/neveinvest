@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth } from '../utils'
+import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth, CARDS, cardMethod, faturaMethod } from '../utils'
+import type { CardId } from '../config/cards'
 import type { PaymentMethod, FixedCost } from '../types'
 import CardSpendGoal from './CardSpendGoal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
 
 const METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
-  { value: 'cartao_xp', label: 'XP', icon: '💳' },
-  { value: 'cartao_mp', label: 'Mercado Pago', icon: '💳' },
+  ...CARDS.map((c) => ({ value: cardMethod(c.id), label: c.label, icon: '💳' })),
   { value: 'pix', label: 'Pix', icon: '📲' },
   { value: 'dinheiro', label: 'Dinheiro', icon: '💵' },
   { value: 'boleto', label: 'Boleto', icon: '🧾' },
@@ -37,14 +37,14 @@ export default function CustosFixos() {
     addExpense, removeExpense,
   } = useStore()
 
-  const [payingFatura, setPayingFatura] = useState<{ card: 'xp' | 'mp'; month: string; amount: number } | null>(null)
+  const [payingFatura, setPayingFatura] = useState<{ card: CardId; month: string; amount: number } | null>(null)
   const [faturaPayForm, setFaturaPayForm] = useState({ date: new Date().toISOString().slice(0, 10) })
-  const [expandedCard, setExpandedCard] = useState<'xp' | 'mp' | null>(null)
+  const [expandedCard, setExpandedCard] = useState<CardId | null>(null)
 
   // Calcula fatura aberta para um cartão em determinado mês
-  function getFaturaAberta(card: 'xp' | 'mp', fatMonth: string): number {
-    const method = card === 'xp' ? 'cartao_xp' : 'cartao_mp'
-    const payMethod = card === 'xp' ? 'fatura_xp' : 'fatura_mp'
+  function getFaturaAberta(card: CardId, fatMonth: string): number {
+    const method = cardMethod(card)
+    const payMethod = faturaMethod(card)
     const total = expenses.filter((e) => e.method === method && e.month === fatMonth).reduce((s, e) => s + e.amount, 0)
     const paid = expenses.filter((e) => e.method === payMethod && e.month === fatMonth).reduce((s, e) => s + e.amount, 0)
     return Math.max(0, total - paid)
@@ -52,8 +52,8 @@ export default function CustosFixos() {
 
 
   // Lista os lançamentos individuais que compõem a fatura de um cartão em determinado mês
-  function getFaturaLancamentos(card: 'xp' | 'mp', fatMonth: string) {
-    const method = card === 'xp' ? 'cartao_xp' : 'cartao_mp'
+  function getFaturaLancamentos(card: CardId, fatMonth: string) {
+    const method = cardMethod(card)
     return expenses
       .filter((e) => e.method === method && e.month === fatMonth)
       .sort((a, b) => b.date.localeCompare(a.date))
@@ -61,16 +61,17 @@ export default function CustosFixos() {
 
   function handlePagarFatura() {
     if (!payingFatura) return
-    const method: PaymentMethod = payingFatura.card === 'xp' ? 'fatura_xp' : 'fatura_mp'
+    const cardLabel = CARDS.find((c) => c.id === payingFatura.card)!.label
+    const method: PaymentMethod = faturaMethod(payingFatura.card)
     addExpense({
       date: faturaPayForm.date,
-      description: payingFatura.card === 'xp' ? 'Pagamento Fatura XP' : 'Pagamento Fatura Mercado Pago',
+      description: `Pagamento Fatura ${cardLabel}`,
       amount: payingFatura.amount,
       method,
       category: 'Outros',
       month: payingFatura.month,
     })
-    showSuccessToast(`Fatura ${payingFatura.card === 'xp' ? 'XP' : 'Mercado Pago'} de ${fmt(payingFatura.amount)} paga.`)
+    showSuccessToast(`Fatura ${cardLabel} de ${fmt(payingFatura.amount)} paga.`)
     setPayingFatura(null)
   }
 
@@ -111,14 +112,13 @@ export default function CustosFixos() {
 
   const activeCosts = (fixedCosts ?? []).filter((c) => isActiveInMonth(c, selectedMonth))
 
-  const totalProjected = activeCosts.reduce((s, c) => s + projectedAmount(c), 0)
-    + getFaturaAberta('xp', selectedMonth) + getFaturaAberta('mp', selectedMonth)
+  const totalFaturaAberta = CARDS.reduce((s, c) => s + getFaturaAberta(c.id, selectedMonth), 0)
+  const totalProjected = activeCosts.reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
   const totalPaid = activeCosts.filter((c) => isPaid(c.id, selectedMonth)).reduce((s, c) => {
     const p = isPaid(c.id, selectedMonth)!
     return s + (expenses.find((e) => e.id === p.expenseId)?.amount ?? 0)
   }, 0)
-  const totalPending = activeCosts.filter((c) => !isPaid(c.id, selectedMonth)).reduce((s, c) => s + projectedAmount(c), 0)
-    + getFaturaAberta('xp', selectedMonth) + getFaturaAberta('mp', selectedMonth)
+  const totalPending = activeCosts.filter((c) => !isPaid(c.id, selectedMonth)).reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
 
   function handleSave() {
     const amount = parseFloat(String(form.defaultAmount).replace(',', '.'))
@@ -267,7 +267,7 @@ export default function CustosFixos() {
           <div className="bg-slate-800 rounded-xl p-3">
             <CardSpendGoal
               slim
-              spent={getFaturaAberta('xp', selectedMonth) + getFaturaAberta('mp', selectedMonth)}
+              spent={totalFaturaAberta}
               limit={[...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]?.limit ?? 8000}
               monthLabelText={monthLabel(selectedMonth)}
             />
@@ -275,10 +275,6 @@ export default function CustosFixos() {
 
           {/* Faturas de Cartão — seção destacada */}
           {(() => {
-            const cards: { card: 'xp' | 'mp'; label: string; closingDay: number; dueDay: number }[] = [
-              { card: 'xp', label: 'Cartão XP', closingDay: 2, dueDay: 10 },
-              { card: 'mp', label: 'Mercado Pago', closingDay: 9, dueDay: 14 },
-            ]
             const faturaMonth = selectedMonth
             return (
               <div className="bg-amber-950/50 border border-amber-700/60 rounded-xl p-4">
@@ -287,10 +283,10 @@ export default function CustosFixos() {
                   <span className="text-xs text-amber-600">{monthLabel(faturaMonth)}</span>
                 </div>
                 <div className="space-y-2">
-                  {cards.map(({ card, label, closingDay, dueDay }) => {
+                  {CARDS.map(({ id: card, label, closingDay, dueDay }) => {
                     const amount = getFaturaAberta(card, faturaMonth)
                     const isPaid = amount === 0 &&
-                      expenses.some((e) => e.method === (card === 'xp' ? 'fatura_xp' : 'fatura_mp') && e.month === faturaMonth)
+                      expenses.some((e) => e.method === faturaMethod(card) && e.month === faturaMonth)
                     const lancamentos = getFaturaLancamentos(card, faturaMonth)
                     const isExpanded = expandedCard === card
                     return (
@@ -612,9 +608,8 @@ export default function CustosFixos() {
                   return s + (expenses.find((e) => e.id === p.expenseId)?.amount ?? 0)
                 }, 0)
 
-                const fatXP = getFaturaAberta('xp', month)
-                const fatMP = getFaturaAberta('mp', month)
-                const totalWithFatura = total + fatXP + fatMP
+                const fatByCard = CARDS.map((c) => ({ card: c, amount: getFaturaAberta(c.id, month) }))
+                const totalWithFatura = total + fatByCard.reduce((s, f) => s + f.amount, 0)
                 return (
                   <div key={month} className={`rounded-lg p-3 ${isCurrent ? 'bg-slate-700 ring-1 ring-emerald-500' : 'bg-slate-700/60'}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -639,18 +634,12 @@ export default function CustosFixos() {
                           </div>
                         )
                       })}
-                      {fatXP > 0 && (
-                        <div className="flex justify-between text-xs text-amber-400">
-                          <span>💳 Fatura XP</span>
-                          <span>{fmt(fatXP)}</span>
+                      {fatByCard.filter((f) => f.amount > 0).map((f) => (
+                        <div key={f.card.id} className="flex justify-between text-xs text-amber-400">
+                          <span>💳 Fatura {f.card.label}</span>
+                          <span>{fmt(f.amount)}</span>
                         </div>
-                      )}
-                      {fatMP > 0 && (
-                        <div className="flex justify-between text-xs text-amber-400">
-                          <span>💳 Fatura Mercado Pago</span>
-                          <span>{fmt(fatMP)}</span>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )
@@ -666,7 +655,7 @@ export default function CustosFixos() {
           <div className="bg-slate-800 rounded-xl p-5 w-full max-w-sm">
             <h3 className="font-semibold text-amber-300 mb-1">💳 Pagar Fatura</h3>
             <p className="text-sm text-slate-400 mb-1">
-              {payingFatura.card === 'xp' ? 'Cartão XP' : 'Mercado Pago'} · {monthLabel(payingFatura.month)}
+              {CARDS.find((c) => c.id === payingFatura.card)!.label} · {monthLabel(payingFatura.month)}
             </p>
             <p className="text-2xl font-bold text-amber-400 mb-4">{fmt(payingFatura.amount)}</p>
             <div>

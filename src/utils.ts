@@ -1,3 +1,7 @@
+import { CARDS, cardConfig, type CardId } from './config/cards'
+
+export { CARDS, type CardId }
+
 export const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
@@ -7,11 +11,25 @@ export function addMonths(ym: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-// Retorna o mês da fatura (YYYY-MM) para uma compra no cartão
-// XP: fecha dia 02 — compras ANTES do dia 02 ficam na fatura deste mês; a partir do dia 02 (inclusive) vão para o próximo
-// MP: fecha dia 09
-export function getFaturaMonth(dateStr: string, card: 'xp' | 'mp'): string {
-  const closingDay = card === 'xp' ? 2 : 9
+export const CARD_METHODS = CARDS.map((c) => `cartao_${c.id}`) as `cartao_${CardId}`[]
+export const FATURA_METHODS = CARDS.map((c) => `fatura_${c.id}`) as `fatura_${CardId}`[]
+
+export function cardMethod(card: CardId): `cartao_${CardId}` { return `cartao_${card}` }
+export function faturaMethod(card: CardId): `fatura_${CardId}` { return `fatura_${card}` }
+
+// A partir de um method ('cartao_itau', 'fatura_mana' etc.) volta pro id do cartão. Usado nos
+// pontos que recebem um `method` solto (formulários, edição, rascunhos do Telegram) e precisam
+// saber a qual cartão ele pertence — substitui o antigo `method === 'cartao_xp' ? 'xp' : 'mp'`,
+// que só fazia sentido com exatamente 2 cartões fixos.
+export function cardIdFromMethod(method: string): CardId {
+  const found = CARDS.find((c) => method === `cartao_${c.id}` || method === `fatura_${c.id}`)
+  return (found ?? CARDS[0]).id
+}
+
+// Retorna o mês da fatura (YYYY-MM) para uma compra no cartão: compras ANTES do dia de fechamento
+// ficam na fatura deste mês; a partir do dia de fechamento (inclusive) vão para o próximo.
+export function getFaturaMonth(dateStr: string, card: CardId): string {
+  const closingDay = cardConfig(card).closingDay
   const d = new Date(dateStr + 'T12:00:00')
   const day = d.getDate()
   const ym = dateStr.slice(0, 7)
@@ -19,7 +37,7 @@ export function getFaturaMonth(dateStr: string, card: 'xp' | 'mp'): string {
 }
 
 // Fatura month da próxima fatura a vencer (baseado em hoje)
-export function nextFaturaMonth(card: 'xp' | 'mp'): string {
+export function nextFaturaMonth(card: CardId): string {
   const today = new Date().toISOString().slice(0, 10)
   return getFaturaMonth(today, card)
 }
@@ -30,7 +48,7 @@ export function nextFaturaMonth(card: 'xp' | 'mp'): string {
 // uma fatura pode estar fechada (não aceita mais compras) e ainda não paga ao mesmo tempo.
 export function overdueFaturaMonth(
   expenses: { method: string; month: string; amount: number }[],
-  card: 'xp' | 'mp'
+  card: CardId
 ): string | null {
   const next = nextFaturaMonth(card)
   // Verifica do mais recente ao mais antigo (janela de 3 meses)
@@ -58,7 +76,7 @@ export const POUPANCA_MONTHLY = 0.005014 // ~6.17% aa
 export const IBOVESPA_ANNUAL = 0.12 // referência histórica
 
 // Métodos de cartão (não efetivados ainda — ficam na fatura / saldo benefício)
-export const CARD_SPEND_METHODS = ['cartao_xp', 'cartao_mp', 'cartao_beneficio']
+export const CARD_SPEND_METHODS: string[] = [...CARD_METHODS, 'cartao_beneficio']
 
 // Agrupa valores por período do mês (semana 1: dia 1-7, semana 2: 8-14, semana 3: 15-21, semana 4: 22-31)
 // com base na data real da compra (não no mês da fatura)
@@ -72,9 +90,9 @@ export function weeklyBuckets(items: { date: string; amount: number }[]): [numbe
   return buckets
 }
 
-export function faturaOpenAmount(expenses: { method: string; month: string; amount: number }[], card: 'xp' | 'mp', month: string): number {
-  const method = card === 'xp' ? 'cartao_xp' : 'cartao_mp'
-  const payMethod = card === 'xp' ? 'fatura_xp' : 'fatura_mp'
+export function faturaOpenAmount(expenses: { method: string; month: string; amount: number }[], card: CardId, month: string): number {
+  const method = cardMethod(card)
+  const payMethod = faturaMethod(card)
   const total = expenses.filter((e) => e.method === method && e.month === month).reduce((s, e) => s + e.amount, 0)
   const paid = expenses.filter((e) => e.method === payMethod && e.month === month).reduce((s, e) => s + e.amount, 0)
   return Math.max(0, total - paid)
@@ -85,13 +103,15 @@ export function faturaOpenAmount(expenses: { method: string; month: string; amou
 // Parcelas futuras ainda não vencidas (meses após a próxima fatura) não entram na conta.
 export function totalOpenCardSpend(
   expenses: { method: string; month: string; amount: number }[],
-  cutoff: { xp: string; mp: string }
+  cutoff: Partial<Record<CardId, string>>
 ): number {
-  const months = new Set(expenses.filter((e) => e.method === 'cartao_xp' || e.method === 'cartao_mp').map((e) => e.month))
+  const months = new Set(expenses.filter((e) => (CARD_METHODS as string[]).includes(e.method)).map((e) => e.month))
   let total = 0
   months.forEach((m) => {
-    if (m <= cutoff.xp) total += faturaOpenAmount(expenses, 'xp', m)
-    if (m <= cutoff.mp) total += faturaOpenAmount(expenses, 'mp', m)
+    CARDS.forEach(({ id }) => {
+      const cut = cutoff[id]
+      if (cut && m <= cut) total += faturaOpenAmount(expenses, id, m)
+    })
   })
   return total
 }
@@ -99,20 +119,22 @@ export function totalOpenCardSpend(
 // Lançamentos individuais de cartão que pertencem a faturas já vencidas/atuais e ainda em aberto (não pagas)
 export function openCardExpenseItems<T extends { method: string; month: string; amount: number }>(
   expenses: T[],
-  cutoff: { xp: string; mp: string }
+  cutoff: Partial<Record<CardId, string>>
 ): T[] {
-  const cardExpenses = expenses.filter((e) => e.method === 'cartao_xp' || e.method === 'cartao_mp')
+  const cardExpenses = expenses.filter((e) => (CARD_METHODS as string[]).includes(e.method))
   const months = new Set(cardExpenses.map((e) => e.month))
   const openMonths = new Set(
     Array.from(months).filter((m) =>
-      (m <= cutoff.xp && faturaOpenAmount(expenses, 'xp', m) > 0) ||
-      (m <= cutoff.mp && faturaOpenAmount(expenses, 'mp', m) > 0)
+      CARDS.some(({ id }) => {
+        const cut = cutoff[id]
+        return cut !== undefined && m <= cut && faturaOpenAmount(expenses, id, m) > 0
+      })
     )
   )
   return cardExpenses.filter((e) => {
     if (!openMonths.has(e.month)) return false
-    const cut = e.method === 'cartao_xp' ? cutoff.xp : cutoff.mp
-    return e.month <= cut
+    const cut = cutoff[cardIdFromMethod(e.method)]
+    return cut !== undefined && e.month <= cut
   })
 }
 
@@ -140,7 +162,7 @@ export function computeSaldo(state: {
   const totalReceivedExtra = (state.extraordinaryIncomes ?? [])
     .filter((e) => e.received)
     .reduce((s, e) => s + e.amount, 0)
-  // Gastos efetivos = tudo exceto lançamentos de cartão (cartao_xp/mp)
+  // Gastos efetivos = tudo exceto lançamentos de cartão de crédito
   const totalEffectiveExpenses = state.expenses
     .filter((e) => !CARD_SPEND_METHODS.includes(e.method))
     .reduce((s, e) => s + e.amount, 0)

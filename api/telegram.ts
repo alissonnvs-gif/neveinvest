@@ -16,8 +16,9 @@ const CATEGORY_KEYWORDS: [string, string[]][] = [
 
 const METHOD_KEYWORDS: [string, string[]][] = [
   ['cartao_beneficio', ['beneficio', 'benefício', ' vr ', ' va ', 'alelo', 'ticket', 'sodexo', 'ducz']],
-  ['cartao_xp', ['cartao xp', 'cartão xp', 'credito xp', 'crédito xp']],
-  ['cartao_mp', ['cartao mp', 'cartão mp', 'cartao mercado pago', 'cartão mercado pago', 'credito mp', 'crédito mp']],
+  ['cartao_itau', ['cartao itau', 'cartão itaú', 'credito itau', 'crédito itaú', 'itau', 'itaú']],
+  ['cartao_visablack', ['visa black', 'cartao visa black', 'cartão visa black', 'visablack']],
+  ['cartao_mana', ['cartao mana', 'cartão mana', 'credito mana', 'crédito mana', 'cartão mana banco', 'mana']],
   ['boleto', ['boleto']],
   ['dinheiro', ['dinheiro', 'especie', 'espécie']],
   ['pix', ['pix']],
@@ -28,12 +29,16 @@ const METHOD_KEYWORDS: [string, string[]][] = [
 const FATURA_QUERY_KEYWORD = 'fatura'
 
 // Duplicado de propósito (mesma razão do CATEGORY_KEYWORDS acima): esta função roda isolada do
-// bundle do frontend. Mantenha em sincronia com getFaturaMonth/nextFaturaMonth/overdueFaturaMonth/
-// faturaOpenAmount em src/utils.ts.
-const CARDS: { card: 'xp' | 'mp'; label: string; closingDay: number; dueDay: number }[] = [
-  { card: 'xp', label: 'XP', closingDay: 2, dueDay: 10 },
-  { card: 'mp', label: 'Mercado Pago', closingDay: 9, dueDay: 14 },
+// bundle do frontend. Mantenha em sincronia com src/config/cards.ts.
+const CARDS: { card: string; label: string; closingDay: number; dueDay: number }[] = [
+  { card: 'itau', label: 'Itaú', closingDay: 10, dueDay: 17 },
+  { card: 'visablack', label: 'Visa Black', closingDay: 1, dueDay: 11 },
+  { card: 'mana', label: 'Mana', closingDay: 8, dueDay: 15 },
 ]
+
+// Cartão padrão quando a mensagem menciona "cartão"/"crédito" sem dizer qual — assume o primeiro
+// cartão da lista.
+const DEFAULT_CARD_METHOD = `cartao_${CARDS[0].card}`
 
 function addMonths(ym: string, n: number): string {
   const [y, m] = ym.split('-').map(Number)
@@ -53,16 +58,16 @@ function nextFaturaMonth(closingDay: number): string {
   return getFaturaMonth(today, closingDay)
 }
 
-function faturaOpenAmount(expenses: { method: string; month: string; amount: number }[], card: 'xp' | 'mp', month: string): number {
-  const method = card === 'xp' ? 'cartao_xp' : 'cartao_mp'
-  const payMethod = card === 'xp' ? 'fatura_xp' : 'fatura_mp'
+function faturaOpenAmount(expenses: { method: string; month: string; amount: number }[], card: string, month: string): number {
+  const method = `cartao_${card}`
+  const payMethod = `fatura_${card}`
   const total = expenses.filter((e) => e.method === method && e.month === month).reduce((s, e) => s + e.amount, 0)
   const paid = expenses.filter((e) => e.method === payMethod && e.month === month).reduce((s, e) => s + e.amount, 0)
   return Math.max(0, total - paid)
 }
 
 // Mês da fatura já fechada e ainda não paga (olha até 3 meses pra trás a partir da fatura aberta).
-function overdueFaturaMonth(expenses: { method: string; month: string; amount: number }[], card: 'xp' | 'mp', closingDay: number): string | null {
+function overdueFaturaMonth(expenses: { method: string; month: string; amount: number }[], card: string, closingDay: number): string | null {
   const next = nextFaturaMonth(closingDay)
   for (let i = 1; i <= 3; i++) {
     const m = addMonths(next, -i)
@@ -111,7 +116,7 @@ function extractAmount(text: string): number | null {
 }
 
 // Detecta "em 2x", "2x", "12x" etc — mesmo padrão que o usuário sempre usa pra parcelamento
-// ("Gastei 90,00 no cartão XP em 2x em compra de blusa"). Sem menção de parcela = 1x (à vista).
+// ("Gastei 90,00 no cartão Itaú em 2x em compra de blusa"). Sem menção de parcela = 1x (à vista).
 // Limitado a 2-12x, mesmo teto do seletor manual em Gastos.tsx.
 function extractInstallments(text: string): number {
   const match = text.match(/\b(\d{1,2})\s*x\b/i)
@@ -138,11 +143,11 @@ function matchMethod(normalized: string): { method: string; keywordEnd: number }
       if (idx !== -1) return { method, keywordEnd: idx + nk.length }
     }
   }
-  // Frases genéricas de cartão sem especificar qual — assume XP. Frase mais longa primeiro,
-  // pra consumir "cartão de crédito" inteiro em vez de parar só em "cartão".
+  // Frases genéricas de cartão sem especificar qual — assume o cartão padrão. Frase mais longa
+  // primeiro, pra consumir "cartão de crédito" inteiro em vez de parar só em "cartão".
   for (const generic of ['cartao de credito', 'cartao', 'credito']) {
     const idx = normalized.indexOf(generic)
-    if (idx !== -1) return { method: 'cartao_xp', keywordEnd: idx + generic.length }
+    if (idx !== -1) return { method: DEFAULT_CARD_METHOD, keywordEnd: idx + generic.length }
   }
   return null
 }
