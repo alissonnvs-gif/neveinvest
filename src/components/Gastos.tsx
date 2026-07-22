@@ -7,9 +7,14 @@ import {
 } from '../utils'
 import type { CardId } from '../config/cards'
 import type { PaymentMethod, Expense } from '../types'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import CardSpendGoal from './CardSpendGoal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
+import {
+  IconCreditCard, IconChevronLeft, IconChevronRight, IconEye, IconEyeOff,
+  IconTicket, IconPencil, IconX, IconAlertTriangle, IconSearch,
+} from '@tabler/icons-react'
+
+const PAGE_GRADIENT = 'linear-gradient(160deg, #f97316, #ec4899)'
 
 export const METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
   ...CARDS.map((c) => ({ value: cardMethod(c.id), label: c.label, icon: '💳' })),
@@ -307,71 +312,86 @@ export default function Gastos() {
     }))
   }
 
+  const cardPct = limit > 0 ? Math.min(100, (cardSpentOpen / limit) * 100) : 0
+  const ringR = 44
+  const ringC = 2 * Math.PI * ringR
+  const ringOffset = ringC - (cardPct / 100) * ringC
+
   return (
-    <div className="space-y-5">
-
-      {/* ── Navegador de mês (controla toda a aba) ── */}
-      <div className="flex items-center justify-between bg-slate-800 rounded-xl px-4 py-3">
-        <button
-          onClick={() => setSelectedMonth((m) => addMonths(m, -1))}
-          className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-lg font-bold transition-colors"
-        >
-          ‹
-        </button>
-        <div className="text-center">
-          <div className="text-lg font-bold text-slate-100">{monthLabel(selectedMonth)}</div>
-          {selectedMonth !== defaultMonth && (
-            <button
-              onClick={() => setSelectedMonth(defaultMonth)}
-              className="text-xs text-emerald-400 hover:text-emerald-300 mt-0.5"
-            >
-              Voltar à fatura atual
-            </button>
-          )}
+    <div className="space-y-4">
+      {/* Cabeçalho colorido com onda */}
+      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+        <div className="relative flex items-center gap-2 mb-5">
+          <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+            <IconCreditCard size={17} color="#fff" />
+          </span>
+          <span className="font-bold text-sm text-white">Gastos</span>
         </div>
-        <button
-          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
-          disabled={selectedMonth >= defaultMonth}
-          className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-lg font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          ›
-        </button>
-      </div>
 
-      {/* Aviso: fatura já fechada (não aceita mais compras) mas ainda não paga */}
-      {overdue.length > 0 && (
-        <div className="bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2 text-xs text-amber-300 space-y-1.5">
-          {overdue.map((o) => (
-            <div key={o.card.id} className="flex items-center justify-between gap-2">
-              <span>⚠️ Fatura {o.card.label} de {monthLabel(o.month!)} fechada, aguardando pagamento — {fmt(o.amount)}</span>
-              <button onClick={() => setSelectedMonth(o.month!)} className="text-amber-200 underline whitespace-nowrap">Ver e pagar</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Saldo em conta */}
-      <div className={`rounded-xl p-4 ${saldo >= 0 ? 'bg-emerald-900/40 border border-emerald-700/50' : 'bg-red-900/40 border border-red-700/50'}`}>
-        <div className="flex items-center justify-between">
+        <div className="relative flex items-center justify-between gap-3">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs text-slate-400">Saldo em Conta</span>
-              <button onClick={toggleHideSaldo} className="text-slate-500 hover:text-slate-300 transition-colors" title={hideSaldo ? 'Mostrar saldo' : 'Ocultar saldo'}>
-                {hideSaldo ? '👁️' : '🙈'}
+            <div className="flex items-center justify-between mb-2">
+              <button onClick={() => setSelectedMonth((m) => addMonths(m, -1))} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
+                <IconChevronLeft size={16} />
+              </button>
+              <div className="text-center">
+                <div className="text-sm font-bold text-white capitalize">{monthLabel(selectedMonth)}</div>
+                {selectedMonth !== defaultMonth && (
+                  <button onClick={() => setSelectedMonth(defaultMonth)} className="text-[10px] text-white/80 underline mt-0.5">
+                    voltar à fatura atual
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+                disabled={selectedMonth >= defaultMonth}
+                className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30"
+              >
+                <IconChevronRight size={16} />
               </button>
             </div>
-            <div className={`text-3xl font-black ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {hideSaldo ? '••••••' : fmt(saldo)}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-white/80">Saldo em conta</span>
+              <button onClick={toggleHideSaldo} className="text-white/70 hover:text-white transition-colors" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
+                {hideSaldo ? <IconEye size={12} /> : <IconEyeOff size={12} />}
+              </button>
             </div>
-            <div className="text-xs text-slate-500 mt-1">rendas recebidas − gastos efetivos − faturas pagas − aportes</div>
+            <div className="text-2xl font-extrabold text-white">{hideSaldo ? '••••••' : fmt(saldo)}</div>
           </div>
-          <div className="text-4xl opacity-30">{saldo >= 0 ? '💰' : '⚠️'}</div>
+
+          <svg width={100} height={100} viewBox="0 0 100 100" className="flex-shrink-0">
+            <circle cx={50} cy={50} r={ringR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={9} />
+            <circle cx={50} cy={50} r={ringR} fill="none" stroke="#fff" strokeWidth={9} strokeLinecap="round" strokeDasharray={ringC} strokeDashoffset={ringOffset} transform="rotate(-90 50 50)" />
+            <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 17 }}>{cardPct.toFixed(0)}%</text>
+            <text x="50%" y="65%" textAnchor="middle" dominantBaseline="central" className="fill-white/80" style={{ fontSize: 8 }}>meta cartão</text>
+          </svg>
         </div>
+
+        <div className="h-14" />
+        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block" style={{ height: 74 }} preserveAspectRatio="none">
+          <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
+        </svg>
       </div>
 
+      {/* Corpo com leve degradê sutil */}
+      <div className="-mx-4 px-4" style={{ background: 'linear-gradient(180deg, #18132e 0%, rgba(52,43,84,0.55) 22%, #18132e 100%)' }}>
+        <div className="space-y-4 pt-1">
+
+          {/* Aviso: fatura já fechada (não aceita mais compras) mas ainda não paga */}
+          {overdue.length > 0 && (
+            <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl px-3 py-2 text-xs text-amber-300 space-y-1.5">
+              {overdue.map((o) => (
+                <div key={o.card.id} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5"><IconAlertTriangle size={13} />Fatura {o.card.label} de {monthLabel(o.month!)} fechada, aguardando pagamento — {fmt(o.amount)}</span>
+                  <button onClick={() => setSelectedMonth(o.month!)} className="text-amber-200 underline whitespace-nowrap">Ver e pagar</button>
+                </div>
+              ))}
+            </div>
+          )}
+
       {/* Rendas do mês selecionado */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-200">Rendas — {monthLabel(selectedMonth)}</h2>
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(93,202,165,0.08)', border: '1px solid rgba(93,202,165,0.2)' }}>
+        <h2 className="font-bold text-[13px] text-slate-100 mb-3">Rendas — {monthLabel(selectedMonth)}</h2>
         {monthIncomes.length === 0 ? (
           <p className="text-slate-500 text-sm text-center py-2">Nenhuma renda cadastrada para {monthLabel(selectedMonth)}.</p>
         ) : (
@@ -442,20 +462,20 @@ export default function Gastos() {
       </div>
 
       {/* Faturas dos cartões — mês selecionado */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-200">Faturas dos Cartões — {monthLabel(selectedMonth)}</h2>
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(237,147,177,0.08)', border: '1px solid rgba(237,147,177,0.2)' }}>
+        <h2 className="font-bold text-[13px] text-slate-100 mb-3">Faturas dos cartões — {monthLabel(selectedMonth)}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {cardTotals.map(({ card, total, fatura, isPaid, paidDate }) => (
-            <div key={card.id} className="bg-slate-700 rounded-lg p-3">
+            <div key={card.id} className="bg-slate-800 rounded-2xl p-3">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-xs text-slate-400">{card.label}</div>
-                <button onClick={() => setDetailCard(card.id)} className="text-xs text-blue-400 hover:text-blue-300">🔍 Ver</button>
+                <button onClick={() => setDetailCard(card.id)} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"><IconSearch size={12} />Ver</button>
               </div>
               <div className="text-lg font-bold text-amber-400">{fmt(total)}</div>
               <div className="text-xs text-slate-500 mb-2">Fecha dia {String(card.closingDay).padStart(2, '0')} · Vence dia {String(card.dueDay).padStart(2, '0')}</div>
               {isPaid ? (
                 <div className="text-center text-xs text-emerald-400 font-medium py-1.5">
-                  ✅ Pago{paidDate ? ` em ${new Date(paidDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : ''}
+                  Pago{paidDate ? ` em ${new Date(paidDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : ''}
                 </div>
               ) : confirmPay === card.id ? (
                 <div className="space-y-1.5">
@@ -521,12 +541,17 @@ export default function Gastos() {
       </CardSpendGoal>
 
       {/* Cartão Benefício — saldo contínuo, sem fechamento/vencimento */}
-      <div className="bg-slate-800 rounded-xl p-4">
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(45,212,191,0.08)', border: '1px solid rgba(45,212,191,0.2)' }}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-200">🎫 Cartão Benefício</h2>
+          <h2 className="font-bold text-[13px] text-slate-100 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(45,212,191,0.2)' }}>
+              <IconTicket size={14} color="#5eead4" />
+            </span>
+            Cartão benefício
+          </h2>
           <button onClick={handleConfirmBenefitCredit}
-            className="text-xs bg-teal-700 hover:bg-teal-600 text-white px-3 py-1.5 rounded font-medium">
-            ✓ Confirmar recarga ({fmt(benefitCardMonthlyAmount)})
+            className="text-xs bg-teal-700 hover:bg-teal-600 text-white px-3 py-1.5 rounded-full font-medium">
+            Confirmar recarga ({fmt(benefitCardMonthlyAmount)})
           </button>
         </div>
 
@@ -546,7 +571,7 @@ export default function Gastos() {
               .slice(0, 5)
               .map((c) => (
                 <div key={c.id} className="flex items-center justify-between text-xs text-slate-500 mt-1">
-                  <span>✅ Recarga de {fmt(c.amount)} em {new Date(c.confirmedDate + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                  <span>Recarga de {fmt(c.amount)} em {new Date(c.confirmedDate + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                   <button onClick={() => { removeBenefitCardCredit(c.id); showSuccessToast('Recarga removida.') }} className="text-slate-600 hover:text-red-400 ml-2">✕</button>
                 </div>
               ))}
@@ -563,17 +588,17 @@ export default function Gastos() {
       </div>
 
       {/* Formulário de lançamento — não muda com o mês selecionado */}
-      <div className="bg-slate-800 rounded-xl p-4">
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-200">Novo Lançamento</h2>
-          <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1">
+          <h2 className="font-bold text-[13px] text-slate-100">Novo lançamento</h2>
+          <div className="flex gap-1 bg-slate-900/50 rounded-full p-1">
             <button type="button" onClick={() => toggleEstorno(false)}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${!form.isEstorno ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${!form.isEstorno ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
               Gasto
             </button>
             <button type="button" onClick={() => toggleEstorno(true)}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${form.isEstorno ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
-              ↩️ Estorno/Crédito
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${form.isEstorno ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+              Estorno/Crédito
             </button>
           </div>
         </div>
@@ -663,39 +688,53 @@ export default function Gastos() {
           )}
 
           <button type="submit"
-            className={`w-full py-2.5 rounded-lg font-medium transition-colors
+            className={`w-full py-2.5 rounded-full font-medium transition-colors
               ${form.isEstorno ? 'bg-teal-600 hover:bg-teal-500'
                 : isCardMethod ? 'bg-amber-600 hover:bg-amber-500'
                 : form.method === 'cartao_beneficio' ? 'bg-teal-600 hover:bg-teal-500'
                 : 'bg-emerald-600 hover:bg-emerald-500'}`}>
             {form.isEstorno
-              ? `↩️ Registrar Estorno na Fatura de ${monthLabel(getFaturaMonth(form.date, cardIdFromMethod(form.method)))}`
+              ? `Registrar estorno na fatura de ${monthLabel(getFaturaMonth(form.date, cardIdFromMethod(form.method)))}`
               : isCardMethod
-              ? parseInt(form.installments) > 1 ? `Parcelar em ${form.installments}x no Cartão` : 'Lançar no Cartão'
-              : form.method === 'cartao_beneficio' ? 'Lançar no Benefício'
-              : 'Lançar Gasto'}
+              ? parseInt(form.installments) > 1 ? `Parcelar em ${form.installments}x no cartão` : 'Lançar no cartão'
+              : form.method === 'cartao_beneficio' ? 'Lançar no benefício'
+              : 'Lançar gasto'}
           </button>
         </form>
       </div>
 
       {/* Gráfico semanal */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-200">Gastos por semana — {monthLabel(selectedMonth)}</h2>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={weeklyData}>
-            <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }} />
-            <ReferenceLine y={limit / 4} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Meta/4', fill: '#f59e0b', fontSize: 10 }} />
-            <Bar dataKey="valor" fill="#10b981" radius={[4, 4, 0, 0]} name="Gasto" />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
+        <h2 className="font-bold text-[13px] text-slate-100 mb-3">Gastos por semana — {monthLabel(selectedMonth)}</h2>
+        <div className="flex items-end gap-2" style={{ height: 60 }}>
+          {weeklyData.map((w) => {
+            const maxVal = Math.max(limit / 4, ...weeklyData.map((x) => x.valor), 1)
+            const heightPct = Math.max(6, (w.valor / maxVal) * 100)
+            const overBudget = w.valor > limit / 4
+            return (
+              <div key={w.name} className="flex-1 flex flex-col items-center gap-1">
+                <div className="w-full rounded-t-lg" style={{
+                  height: `${heightPct}%`,
+                  background: overBudget ? 'linear-gradient(180deg, #f97316, #ec4899)' : '#3d3659',
+                }} />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex gap-2 mt-1">
+          {weeklyData.map((w) => (
+            <div key={w.name} className="flex-1 text-center">
+              <div className="text-[9px] text-slate-400">{w.name}</div>
+              <div className="text-[10px] font-bold text-slate-200">{fmt(w.valor)}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Por categoria */}
       {byCategory.length > 0 && (
-        <div className="bg-slate-800 rounded-xl p-4">
-          <h2 className="font-semibold mb-3 text-slate-200">Por categoria — {monthLabel(selectedMonth)}</h2>
+        <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
+          <h2 className="font-bold text-[13px] text-slate-100 mb-3">Por categoria — {monthLabel(selectedMonth)}</h2>
           {byCategory.sort((a, b) => b.valor - a.valor).map((c) => (
             <div key={c.name} className="mb-2">
               <div className="flex justify-between text-sm mb-1">
@@ -703,7 +742,7 @@ export default function Gastos() {
                 <span className="text-slate-200">{fmt(c.valor)}</span>
               </div>
               <div className="h-2 bg-slate-700 rounded-full">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((c.valor / (cardSpent || 1)) * 100, 100)}%` }} />
+                <div className="h-full rounded-full" style={{ width: `${Math.min((c.valor / (cardSpent || 1)) * 100, 100)}%`, background: 'linear-gradient(90deg, #7c3aed, #d946ef)' }} />
               </div>
             </div>
           ))}
@@ -711,8 +750,8 @@ export default function Gastos() {
       )}
 
       {/* Lista de lançamentos */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-200">Lançamentos — {monthLabel(selectedMonth)}</h2>
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(148,139,199,0.08)', border: '1px solid rgba(148,139,199,0.2)' }}>
+        <h2 className="font-bold text-[13px] text-slate-100 mb-3">Lançamentos — {monthLabel(selectedMonth)}</h2>
         {monthExpenses.length === 0 ? (
           <p className="text-slate-500 text-sm text-center py-4">Nenhum lançamento em {monthLabel(selectedMonth)}</p>
         ) : (
@@ -725,10 +764,10 @@ export default function Gastos() {
                 : isCard ? 'bg-amber-900/20 border border-amber-800/30'
                 : isFatura ? 'bg-blue-900/20 border border-blue-800/30'
                 : isBeneficio ? 'bg-teal-900/20 border border-teal-800/30'
-                : 'bg-slate-700'
+                : 'bg-slate-800'
               const amtColor = e.isEstorno ? 'text-emerald-400' : isCard ? 'text-amber-400' : isFatura ? 'text-blue-400' : isBeneficio ? 'text-teal-400' : 'text-emerald-400'
               return (
-                <div key={e.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${bg}`}>
+                <div key={e.id} className={`flex items-center justify-between rounded-2xl px-3 py-2 ${bg}`}>
                   <div className="flex-1 min-w-0 pr-2">
                     <div className="text-sm text-slate-200 truncate">{e.description}</div>
                     <div className="text-xs text-slate-400">
@@ -744,8 +783,8 @@ export default function Gastos() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={`font-medium ${amtColor}`}>{fmt(e.amount)}</span>
-                    <button onClick={() => openEditModal(e)} className="text-slate-500 hover:text-blue-400 text-xs" title="Editar">✏️</button>
-                    <button onClick={() => { removeExpense(e.id); showSuccessToast('Lançamento removido.') }} className="text-slate-500 hover:text-red-400 text-xs">✕</button>
+                    <button onClick={() => openEditModal(e)} className="text-slate-500 hover:text-blue-400" title="Editar"><IconPencil size={14} /></button>
+                    <button onClick={() => { removeExpense(e.id); showSuccessToast('Lançamento removido.') }} className="text-slate-500 hover:text-red-400"><IconX size={14} /></button>
                   </div>
                 </div>
               )
@@ -754,28 +793,44 @@ export default function Gastos() {
         )}
       </div>
 
+        </div>
+
+        {/* Fecho da página — colina decorativa */}
+        <div className="relative -mx-4 mt-2">
+          <svg viewBox="0 0 320 60" className="w-full block" style={{ height: 60 }} preserveAspectRatio="none">
+            <path d="M0,60 L0,30 C 70,5 110,45 180,25 C 240,8 280,35 320,20 L320,60 Z" fill="#241e42" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-end pb-2.5">
+            <span className="w-8 h-8 rounded-full flex items-center justify-center mb-1" style={{ background: PAGE_GRADIENT, boxShadow: '0 4px 14px rgba(236,72,153,0.4)' }}>
+              <IconCreditCard size={16} color="#fff" />
+            </span>
+            <span className="text-[10px] font-bold text-slate-200">Tudo em dia por aqui</span>
+          </div>
+        </div>
+      </div>
+
       {/* Modal de detalhes da fatura */}
       {detailCard && (() => {
         const info = cardTotals.find((c) => c.card.id === detailCard)!
         return (
           <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 rounded-xl p-5 w-full max-w-sm max-h-[80vh] flex flex-col">
+            <div className="bg-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[80vh] flex flex-col">
               <div className="flex items-center justify-between mb-1">
-                <h3 className="font-semibold text-amber-300">💳 {info.card.label}</h3>
-                <button onClick={() => setDetailCard(null)} className="text-slate-500 hover:text-slate-300 text-lg">✕</button>
+                <h3 className="font-bold text-amber-300">{info.card.label}</h3>
+                <button onClick={() => setDetailCard(null)} className="text-slate-500 hover:text-slate-300"><IconX size={18} /></button>
               </div>
               <p className="text-sm text-slate-400 mb-3">
                 Fatura {monthLabel(selectedMonth)} · Total {fmt(info.total)}
-                {info.isPaid && <span className="text-emerald-400"> · ✅ Pago</span>}
+                {info.isPaid && <span className="text-emerald-400"> · Pago</span>}
               </p>
               <div className="flex-1 overflow-y-auto space-y-1.5">
                 {getFaturaLancamentos(detailCard).length === 0 ? (
                   <p className="text-slate-500 text-sm text-center py-6">Nenhum lançamento nesta fatura.</p>
                 ) : (
                   getFaturaLancamentos(detailCard).map((e) => (
-                    <div key={e.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${e.isEstorno ? 'bg-emerald-900/20 border border-emerald-800/40' : 'bg-slate-700'}`}>
+                    <div key={e.id} className={`flex items-center justify-between rounded-2xl px-3 py-2 ${e.isEstorno ? 'bg-emerald-900/20 border border-emerald-800/40' : 'bg-slate-700'}`}>
                       <div className="min-w-0 pr-2">
-                        <div className="text-sm text-slate-200 truncate">{e.isEstorno ? '↩️ ' : ''}{e.description}</div>
+                        <div className="text-sm text-slate-200 truncate">{e.description}</div>
                         <div className="text-xs text-slate-400">
                           {new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR')} · {e.isEstorno ? 'Estorno' : e.category}
                           {e.installments && e.installments > 1 && ` · ${e.installmentNumber}/${e.installments}`}
@@ -786,7 +841,7 @@ export default function Gastos() {
                   ))
                 )}
               </div>
-              <button onClick={() => setDetailCard(null)} className="mt-4 w-full bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-sm">Fechar</button>
+              <button onClick={() => setDetailCard(null)} className="mt-4 w-full bg-slate-700 hover:bg-slate-600 py-2.5 rounded-full text-sm">Fechar</button>
             </div>
           </div>
         )
@@ -795,10 +850,10 @@ export default function Gastos() {
       {/* Modal de edição */}
       {editingExpense && (
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-200">{editingExpense.isEstorno ? '↩️ Editar Estorno' : '✏️ Editar Lançamento'}</h3>
-              <button onClick={() => setEditingExpense(null)} className="text-slate-500 hover:text-slate-300 text-lg">✕</button>
+              <h3 className="font-bold text-slate-200">{editingExpense.isEstorno ? 'Editar estorno' : 'Editar lançamento'}</h3>
+              <button onClick={() => setEditingExpense(null)} className="text-slate-500 hover:text-slate-300"><IconX size={18} /></button>
             </div>
             <form onSubmit={handleSaveEdit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -843,8 +898,8 @@ export default function Gastos() {
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
-                <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2.5 rounded-lg text-sm font-medium">Salvar</button>
-                <button type="button" onClick={() => setEditingExpense(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-sm">Cancelar</button>
+                <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2.5 rounded-full text-sm font-medium">Salvar</button>
+                <button type="button" onClick={() => setEditingExpense(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-full text-sm">Cancelar</button>
               </div>
             </form>
           </div>
