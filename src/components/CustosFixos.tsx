@@ -5,6 +5,12 @@ import type { CardId } from '../config/cards'
 import type { PaymentMethod, FixedCost } from '../types'
 import CardSpendGoal from './CardSpendGoal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
+import {
+  IconClipboardList, IconChevronLeft, IconChevronRight, IconCreditCard,
+  IconCheck, IconX,
+} from '@tabler/icons-react'
+
+const PAGE_GRADIENT = 'linear-gradient(160deg, #3b82f6, #7c3aed)'
 
 const METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
   ...CARDS.map((c) => ({ value: cardMethod(c.id), label: c.label, icon: '💳' })),
@@ -213,58 +219,76 @@ export default function CustosFixos() {
   const prevMonth = addMonths(selectedMonth, -1)
   const nextMonth = addMonths(selectedMonth, 1)
 
+  const paidPct = totalProjected > 0 ? Math.min(100, (totalPaid / totalProjected) * 100) : 0
+  const ringR = 44
+  const ringC = 2 * Math.PI * ringR
+  const ringOffset = ringC - (paidPct / 100) * ringC
+
   return (
     <div className="space-y-4">
-      {/* Header com abas internas */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="font-bold text-lg text-slate-100">📋 Custos Fixos</h1>
-          <span className="text-xs text-slate-400">{(fixedCosts ?? []).filter((c) => c.active).length} ativos</span>
+      {/* Cabeçalho colorido com onda */}
+      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconClipboardList size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">Custos fixos</span>
+          </div>
+          <span className="text-[11px] text-white/80">{(fixedCosts ?? []).filter((c) => c.active).length} ativos</span>
         </div>
-        <div className="flex gap-2">
+
+        <div className="relative flex items-center justify-between gap-3 mb-4">
+          <div className="flex-1">
+            <div className="text-[11px] text-white/80">Projetado — {monthLabel(selectedMonth)}</div>
+            <div className="text-2xl font-extrabold text-white">{fmt(totalProjected)}</div>
+            <div className="text-[11px] text-white/70 mt-0.5">pago {fmt(totalPaid)} · pendente {fmt(totalPending)}</div>
+          </div>
+          <svg width={100} height={100} viewBox="0 0 100 100" className="flex-shrink-0">
+            <circle cx={50} cy={50} r={ringR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={9} />
+            <circle cx={50} cy={50} r={ringR} fill="none" stroke="#fff" strokeWidth={9} strokeLinecap="round" strokeDasharray={ringC} strokeDashoffset={ringOffset} transform="rotate(-90 50 50)" />
+            <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 17 }}>{paidPct.toFixed(0)}%</text>
+            <text x="50%" y="65%" textAnchor="middle" dominantBaseline="central" className="fill-white/80" style={{ fontSize: 8 }}>pago</text>
+          </svg>
+        </div>
+
+        <div className="relative flex gap-1.5 mb-4">
           {(['checklist', 'gerenciar', 'projecao'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setActiveSection(s)}
-              className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors
-                ${activeSection === s ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+              className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
+                ${activeSection === s ? 'bg-white text-slate-900' : 'bg-white/15 text-white hover:bg-white/25'}`}
             >
-              {s === 'checklist' ? '✅ Checklist' : s === 'gerenciar' ? '⚙️ Gerenciar' : '📆 Projeção'}
+              {s === 'checklist' ? 'Checklist' : s === 'gerenciar' ? 'Gerenciar' : 'Projeção'}
             </button>
           ))}
         </div>
+
+        <div className="h-8" />
+        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block" style={{ height: 74 }} preserveAspectRatio="none">
+          <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
+        </svg>
       </div>
+
+      {/* Corpo com leve degradê sutil */}
+      <div className="-mx-4 px-4" style={{ background: 'linear-gradient(180deg, #18132e 0%, rgba(52,43,84,0.55) 22%, #18132e 100%)' }}>
+      <div className="space-y-4 pt-1">
 
       {/* ── CHECKLIST DO MÊS ── */}
       {activeSection === 'checklist' && (
         <div className="space-y-4">
           {/* Seletor de mês */}
-          <div className="bg-slate-800 rounded-xl p-4">
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(45,212,191,0.08)', border: '1px solid rgba(45,212,191,0.2)' }}>
             <div className="flex items-center justify-between">
-              <button onClick={() => setSelectedMonth(prevMonth)} className="text-slate-400 hover:text-slate-200 px-2 py-1">‹</button>
-              <span className="font-semibold text-slate-200">{monthLabel(selectedMonth)}</span>
-              <button onClick={() => setSelectedMonth(nextMonth)} className="text-slate-400 hover:text-slate-200 px-2 py-1">›</button>
-            </div>
-
-            {/* Resumo */}
-            <div className="grid grid-cols-3 gap-3 mt-3">
-              <div className="bg-slate-700 rounded-lg p-2 text-center">
-                <div className="text-xs text-slate-400 mb-0.5">Projetado</div>
-                <div className="text-sm font-bold text-slate-200">{fmt(totalProjected)}</div>
-              </div>
-              <div className="bg-emerald-900/40 rounded-lg p-2 text-center">
-                <div className="text-xs text-emerald-400 mb-0.5">Pago</div>
-                <div className="text-sm font-bold text-emerald-300">{fmt(totalPaid)}</div>
-              </div>
-              <div className="bg-amber-900/40 rounded-lg p-2 text-center">
-                <div className="text-xs text-amber-400 mb-0.5">Pendente</div>
-                <div className="text-sm font-bold text-amber-300">{fmt(totalPending)}</div>
-              </div>
+              <button onClick={() => setSelectedMonth(prevMonth)} className="text-slate-400 hover:text-slate-200 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center"><IconChevronLeft size={15} /></button>
+              <span className="font-bold text-[13px] text-slate-100 capitalize">{monthLabel(selectedMonth)}</span>
+              <button onClick={() => setSelectedMonth(nextMonth)} className="text-slate-400 hover:text-slate-200 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center"><IconChevronRight size={15} /></button>
             </div>
           </div>
 
           {/* Meta de gastos no cartão (slim) */}
-          <div className="bg-slate-800 rounded-xl p-3">
+          <div className="rounded-3xl p-3.5" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)' }}>
             <CardSpendGoal
               slim
               spent={totalFaturaAberta}
@@ -277,9 +301,10 @@ export default function CustosFixos() {
           {(() => {
             const faturaMonth = selectedMonth
             return (
-              <div className="bg-amber-950/50 border border-amber-700/60 rounded-xl p-4">
+              <div className="rounded-3xl p-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-amber-400 font-semibold text-sm">💳 Faturas de Cartão</span>
+                  <IconCreditCard size={14} color="#fbbf24" />
+                  <span className="text-amber-400 font-bold text-[13px]">Faturas de cartão</span>
                   <span className="text-xs text-amber-600">{monthLabel(faturaMonth)}</span>
                 </div>
                 <div className="space-y-2">
@@ -290,7 +315,7 @@ export default function CustosFixos() {
                     const lancamentos = getFaturaLancamentos(card, faturaMonth)
                     const isExpanded = expandedCard === card
                     return (
-                      <div key={card} className={`rounded-lg overflow-hidden border
+                      <div key={card} className={`rounded-2xl overflow-hidden border
                         ${isPaid ? 'bg-emerald-900/30 border-emerald-800/40' : 'bg-amber-900/20 border-amber-800/30'}`}>
                         <div className="px-3 py-3 flex items-center gap-3">
                           <button
@@ -351,7 +376,7 @@ export default function CustosFixos() {
           })()}
 
           {/* Lista de custos do mês */}
-          <div className="bg-slate-800 rounded-xl p-4">
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
             {activeCosts.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-6">
                 Nenhum custo fixo ativo neste mês.<br />
@@ -367,7 +392,7 @@ export default function CustosFixos() {
                   return (
                     <div
                       key={cost.id}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-3 transition-colors
+                      className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors
                         ${payment ? 'bg-emerald-900/30 border border-emerald-800/50' : 'bg-slate-700'}`}
                     >
                       <button
@@ -408,12 +433,12 @@ export default function CustosFixos() {
       {/* ── GERENCIAR ── */}
       {activeSection === 'gerenciar' && (
         <div className="space-y-4">
-          <div className="bg-slate-800 rounded-xl p-4">
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-slate-200">Custos cadastrados</h2>
+              <h2 className="font-bold text-[13px] text-slate-100">Custos cadastrados</h2>
               <button
                 onClick={() => { setShowForm(!showForm); setEditingId(null); setForm(emptyForm) }}
-                className="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg text-sm font-medium"
+                className="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-full text-sm font-medium"
               >
                 + Novo
               </button>
@@ -427,7 +452,7 @@ export default function CustosFixos() {
               {(fixedCosts ?? []).map((cost) => {
                 const end = getEndMonth(cost)
                 return (
-                  <div key={cost.id} className="bg-slate-700 rounded-lg px-3 py-2.5 flex items-center gap-3">
+                  <div key={cost.id} className="bg-slate-700 rounded-2xl px-3 py-2.5 flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-medium ${cost.active ? 'text-slate-200' : 'text-slate-500'}`}>
@@ -467,8 +492,8 @@ export default function CustosFixos() {
 
           {/* Formulário de cadastro/edição */}
           {showForm && (
-            <div className="bg-slate-800 rounded-xl p-4">
-              <h2 className="font-semibold text-slate-200 mb-3">
+            <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
+              <h2 className="font-bold text-[13px] text-slate-100 mb-3">
                 {editingId ? 'Editar custo fixo' : 'Novo custo fixo'}
               </h2>
               <div className="space-y-3">
@@ -573,13 +598,13 @@ export default function CustosFixos() {
                 <div className="flex gap-2 pt-1">
                   <button
                     onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm) }}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm"
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-full text-sm"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleSave}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2 rounded-lg text-sm font-medium"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2 rounded-full text-sm font-medium"
                   >
                     {editingId ? 'Salvar alterações' : 'Cadastrar'}
                   </button>
@@ -592,8 +617,8 @@ export default function CustosFixos() {
 
       {/* ── PROJEÇÃO ── */}
       {activeSection === 'projecao' && (
-        <div className="bg-slate-800 rounded-xl p-4">
-          <h2 className="font-semibold text-slate-200 mb-3">Projeção — próximos 6 meses</h2>
+        <div className="rounded-3xl p-4" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
+          <h2 className="font-bold text-[13px] text-slate-100 mb-3">Projeção — próximos 6 meses</h2>
           {(fixedCosts ?? []).length === 0 ? (
             <p className="text-slate-500 text-sm text-center py-6">Nenhum custo fixo cadastrado ainda.</p>
           ) : (
@@ -611,7 +636,7 @@ export default function CustosFixos() {
                 const fatByCard = CARDS.map((c) => ({ card: c, amount: getFaturaAberta(c.id, month) }))
                 const totalWithFatura = total + fatByCard.reduce((s, f) => s + f.amount, 0)
                 return (
-                  <div key={month} className={`rounded-lg p-3 ${isCurrent ? 'bg-slate-700 ring-1 ring-emerald-500' : 'bg-slate-700/60'}`}>
+                  <div key={month} className={`rounded-2xl p-3 ${isCurrent ? 'bg-slate-700 ring-1 ring-emerald-500' : 'bg-slate-700/60'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className={`font-medium text-sm ${isCurrent ? 'text-emerald-400' : 'text-slate-300'}`}>
                         {monthLabel(month)} {isCurrent && '← atual'}
@@ -636,7 +661,7 @@ export default function CustosFixos() {
                       })}
                       {fatByCard.filter((f) => f.amount > 0).map((f) => (
                         <div key={f.card.id} className="flex justify-between text-xs text-amber-400">
-                          <span>💳 Fatura {f.card.label}</span>
+                          <span>Fatura {f.card.label}</span>
                           <span>{fmt(f.amount)}</span>
                         </div>
                       ))}
@@ -649,11 +674,27 @@ export default function CustosFixos() {
         </div>
       )}
 
+      </div>
+
+      {/* Fecho da página — colina decorativa */}
+      <div className="relative -mx-4 mt-2">
+        <svg viewBox="0 0 320 60" className="w-full block" style={{ height: 60 }} preserveAspectRatio="none">
+          <path d="M0,60 L0,30 C 70,5 110,45 180,25 C 240,8 280,35 320,20 L320,60 Z" fill="#241e42" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-2.5">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center mb-1" style={{ background: PAGE_GRADIENT, boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>
+            <IconClipboardList size={16} color="#fff" />
+          </span>
+          <span className="text-[10px] font-bold text-slate-200">Tudo em dia por aqui</span>
+        </div>
+      </div>
+      </div>
+
       {/* ── MODAL DE PAGAMENTO DE FATURA ── */}
       {payingFatura && (
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl p-5 w-full max-w-sm">
-            <h3 className="font-semibold text-amber-300 mb-1">💳 Pagar Fatura</h3>
+          <div className="bg-slate-800 rounded-3xl p-5 w-full max-w-sm">
+            <h3 className="font-bold text-amber-300 mb-1">Pagar fatura</h3>
             <p className="text-sm text-slate-400 mb-1">
               {CARDS.find((c) => c.id === payingFatura.card)!.label} · {monthLabel(payingFatura.month)}
             </p>
@@ -668,8 +709,8 @@ export default function CustosFixos() {
               />
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setPayingFatura(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-sm">Cancelar</button>
-              <button onClick={handlePagarFatura} className="flex-1 bg-amber-700 hover:bg-amber-600 py-2.5 rounded-lg text-sm font-medium text-white">✓ Confirmar pagamento</button>
+              <button onClick={() => setPayingFatura(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-full text-sm">Cancelar</button>
+              <button onClick={handlePagarFatura} className="flex-1 bg-amber-700 hover:bg-amber-600 py-2.5 rounded-full text-sm font-medium text-white">Confirmar pagamento</button>
             </div>
           </div>
         </div>
@@ -678,8 +719,8 @@ export default function CustosFixos() {
       {/* ── MODAL DE PAGAMENTO ── */}
       {payingCost && (
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl p-5 w-full max-w-sm">
-            <h3 className="font-semibold text-slate-200 mb-1">Confirmar pagamento</h3>
+          <div className="bg-slate-800 rounded-3xl p-5 w-full max-w-sm">
+            <h3 className="font-bold text-slate-200 mb-1">Confirmar pagamento</h3>
             <p className="text-sm text-slate-400 mb-4">{payingCost.description}</p>
 
             <div className="space-y-3">
@@ -732,15 +773,15 @@ export default function CustosFixos() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setPayingCost(null)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-sm"
+                className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-full text-sm"
               >
                 Cancelar
               </button>
               <button
                 onClick={handlePay}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2.5 rounded-lg text-sm font-medium"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2.5 rounded-full text-sm font-medium"
               >
-                ✓ Lançar como gasto
+                Lançar como gasto
               </button>
             </div>
           </div>
