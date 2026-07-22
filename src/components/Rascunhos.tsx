@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { fetchPendingDrafts, resolveDraft, type TelegramDraft } from '../lib/supabase'
+import { fetchPendingDrafts, resolveDraft, supabase, type TelegramDraft } from '../lib/supabase'
 import { getFaturaMonth, addMonths, CARD_METHODS, cardIdFromMethod } from '../utils'
 import { CATEGORIES, METHODS } from './Gastos'
 import type { Expense, PaymentMethod } from '../types'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
+import {
+  IconBuildingBank, IconLogout, IconInbox, IconCheck, IconX,
+} from '@tabler/icons-react'
+
+const PAGE_GRADIENT = 'linear-gradient(160deg, #f43f5e, #a855f7)'
 
 const POLL_MS = 15000
 
@@ -166,31 +171,57 @@ export default function Rascunhos() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold text-slate-200 mb-1">📥 Rascunhos do Telegram</h2>
-        <p className="text-xs text-slate-500">
-          Gastos enviados pelo Telegram ficam aqui até você revisar e confirmar. Nada é lançado sem sua confirmação.
-        </p>
+      {/* Cabeçalho colorido com onda */}
+      <div className="relative -mx-4 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconBuildingBank size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">NeveInvest</span>
+          </div>
+          <button onClick={() => supabase.auth.signOut()} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white/90" title="Sair">
+            <IconLogout size={15} />
+          </button>
+        </div>
+        <div className="relative text-center mb-2">
+          <div className="text-[11px] text-white/75">Rascunhos do Telegram pendentes</div>
+          <div className="text-3xl font-extrabold text-white">{loading ? '—' : sorted.length}</div>
+          <div className="text-[11px] text-white/70 mt-1">Gastos enviados pelo Telegram ficam aqui até você revisar e confirmar. Nada é lançado sem sua confirmação.</div>
+        </div>
+        <div className="h-10" />
+        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block" style={{ height: 74 }} preserveAspectRatio="none">
+          <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
+        </svg>
       </div>
+
+      {/* Corpo com leve degradê sutil */}
+      <div className="-mx-4 px-4" style={{ background: 'linear-gradient(180deg, #18132e 0%, rgba(52,43,84,0.55) 22%, #18132e 100%)' }}>
+      <div className="space-y-4 pt-1">
 
       {loading ? (
         <p className="text-slate-500 text-sm text-center py-6">Carregando...</p>
       ) : sorted.length === 0 ? (
-        <p className="text-slate-500 text-sm text-center py-6">Nenhum rascunho pendente.</p>
+        <div className="flex items-center justify-center gap-2 py-8">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: PAGE_GRADIENT }}>
+            <IconInbox size={16} color="#fff" />
+          </span>
+          <span className="text-slate-300 text-sm">Nenhum rascunho pendente</span>
+        </div>
       ) : (
         <>
           <div className="flex gap-2">
             <button disabled={bulkBusy} onClick={handleConfirmAll}
-              className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 py-2 rounded-lg text-xs font-medium">
-              ✓ Confirmar todos ({sorted.length})
+              className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 py-2 rounded-full text-xs font-medium flex items-center justify-center gap-1">
+              <IconCheck size={13} />Confirmar todos ({sorted.length})
             </button>
             <button disabled={bulkBusy} onClick={handleDiscardAll}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 py-2 rounded-lg text-xs">
-              ✕ Descartar todos ({sorted.length})
+              className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 py-2 rounded-full text-xs flex items-center justify-center gap-1">
+              <IconX size={13} />Descartar todos ({sorted.length})
             </button>
           </div>
 
-          <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <div className="rounded-3xl overflow-hidden" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 border-b border-slate-700">
@@ -233,15 +264,15 @@ export default function Rascunhos() {
                             disabled={rowBusy}
                             onClick={(e) => { e.stopPropagation(); handleConfirm(d) }}
                             title="Confirmar e lançar"
-                            className="w-7 h-7 flex items-center justify-center rounded bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs">
-                            ✓
+                            className="w-7 h-7 flex items-center justify-center rounded-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white">
+                            <IconCheck size={13} />
                           </button>
                           <button
                             disabled={rowBusy}
                             onClick={(e) => { e.stopPropagation(); handleDiscard(d) }}
                             title="Descartar"
-                            className="w-7 h-7 flex items-center justify-center rounded bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white text-xs">
-                            ✕
+                            className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white">
+                            <IconX size={13} />
                           </button>
                         </div>
                       </td>
@@ -254,12 +285,28 @@ export default function Rascunhos() {
         </>
       )}
 
+      </div>
+
+      {/* Fecho da página — colina decorativa */}
+      <div className="relative -mx-4 mt-2">
+        <svg viewBox="0 0 320 60" className="w-full block" style={{ height: 60 }} preserveAspectRatio="none">
+          <path d="M0,60 L0,30 C 70,5 110,45 180,25 C 240,8 280,35 320,20 L320,60 Z" fill="#241e42" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-2.5">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center mb-1" style={{ background: PAGE_GRADIENT, boxShadow: '0 4px 14px rgba(168,85,247,0.4)' }}>
+            <IconInbox size={16} color="#fff" />
+          </span>
+          <span className="text-[10px] font-bold text-slate-200">Tudo em dia por aqui</span>
+        </div>
+      </div>
+      </div>
+
       {openDraft && openForm && (
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-semibold text-slate-200">📥 Revisar rascunho</h3>
-              <button onClick={() => setOpenId(null)} className="text-slate-500 hover:text-slate-300 text-lg">✕</button>
+              <h3 className="font-bold text-slate-200">Revisar rascunho</h3>
+              <button onClick={() => setOpenId(null)} className="text-slate-500 hover:text-slate-300"><IconX size={18} /></button>
             </div>
             <div className="text-xs text-slate-500 italic mb-4">
               {openDraft.sender_name && <span className="not-italic font-medium text-slate-400">{openDraft.sender_name}: </span>}
@@ -331,11 +378,11 @@ export default function Rascunhos() {
 
               <div className="flex gap-2 pt-1">
                 <button disabled={busy} onClick={() => handleConfirm(openDraft)}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium">
-                  ✓ Confirmar e lançar
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 py-2.5 rounded-full text-sm font-medium">
+                  Confirmar e lançar
                 </button>
                 <button disabled={busy} onClick={() => handleDiscard(openDraft)}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 py-2.5 rounded-lg text-sm">
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 py-2.5 rounded-full text-sm">
                   Descartar
                 </button>
               </div>

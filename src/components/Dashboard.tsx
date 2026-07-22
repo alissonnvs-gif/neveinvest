@@ -115,7 +115,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       {/* Cabeçalho colorido com onda */}
-      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: 'linear-gradient(160deg, #7c3aed, #d946ef 55%, #f97316)' }}>
+      <div className="relative -mx-4 px-4 pt-4 overflow-hidden" style={{ background: 'linear-gradient(160deg, #7c3aed, #d946ef 55%, #f97316)' }}>
         <div className="relative flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">

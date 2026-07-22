@@ -9,8 +9,9 @@ import type { CardId } from '../config/cards'
 import type { PaymentMethod, Expense } from '../types'
 import CardSpendGoal from './CardSpendGoal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
+import { supabase } from '../lib/supabase'
 import {
-  IconCreditCard, IconChevronLeft, IconChevronRight, IconEye, IconEyeOff,
+  IconBuildingBank, IconLogout, IconCreditCard, IconChevronLeft, IconChevronRight, IconEye, IconEyeOff,
   IconTicket, IconPencil, IconX, IconAlertTriangle, IconSearch,
 } from '@tabler/icons-react'
 
@@ -320,12 +321,17 @@ export default function Gastos() {
   return (
     <div className="space-y-4">
       {/* Cabeçalho colorido com onda */}
-      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
-        <div className="relative flex items-center gap-2 mb-5">
-          <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-            <IconCreditCard size={17} color="#fff" />
-          </span>
-          <span className="font-bold text-sm text-white">Gastos</span>
+      <div className="relative -mx-4 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconBuildingBank size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">NeveInvest</span>
+          </div>
+          <button onClick={() => supabase.auth.signOut()} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white/90" title="Sair">
+            <IconLogout size={15} />
+          </button>
         </div>
 
         <div className="relative flex items-center justify-between gap-3">

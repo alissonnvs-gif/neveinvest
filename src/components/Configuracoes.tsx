@@ -3,7 +3,8 @@ import { useStore } from '../store'
 import { fmt, currentMonth, monthLabel, computeBenefitBalance } from '../utils'
 import type { ExtraordinaryIncome } from '../types'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
-import { IconSettings, IconTicket, IconX } from '@tabler/icons-react'
+import { supabase } from '../lib/supabase'
+import { IconBuildingBank, IconLogout, IconSettings, IconTicket, IconX } from '@tabler/icons-react'
 
 const PAGE_GRADIENT = 'linear-gradient(160deg, #584f7c, #3d3659)'
 
@@ -77,12 +78,17 @@ export default function Configuracoes() {
   return (
     <div className="space-y-4">
       {/* Cabeçalho colorido com onda */}
-      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
-        <div className="relative flex items-center gap-2 mb-5">
-          <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-            <IconSettings size={17} color="#fff" />
-          </span>
-          <span className="font-bold text-sm text-white">Configurações</span>
+      <div className="relative -mx-4 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconBuildingBank size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">NeveInvest</span>
+          </div>
+          <button onClick={() => supabase.auth.signOut()} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white/90" title="Sair">
+            <IconLogout size={15} />
+          </button>
         </div>
         <div className="relative text-center mb-2">
           <div className="text-[11px] text-white/75">Renda total cadastrada</div>

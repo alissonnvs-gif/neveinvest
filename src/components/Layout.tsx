@@ -22,29 +22,10 @@ const tabs: { id: Tab; label: string; icon: typeof IconHome; color: string }[] =
   { id: 'configuracoes', label: 'Config', icon: IconSettings, color: '#948bc7' },
 ]
 
-export default function Layout({ active, onChange, children, draftsCount = 0, onLogout }: Props) {
+export default function Layout({ active, onChange, children, draftsCount = 0 }: Props) {
   return (
     <div className="min-h-screen flex flex-col">
-      {active !== 'dashboard' && (
-        <header className="px-4 pt-4 pb-2 flex items-center justify-between max-w-5xl mx-auto w-full">
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-full brand-gradient-bg flex items-center justify-center text-lg shadow-lg shadow-fuchsia-900/30 flex-shrink-0">🏦</span>
-            <div className="leading-tight">
-              <div className="font-bold text-base brand-gradient-text">NeveInvest</div>
-              <div className="text-[11px] text-slate-500 capitalize">
-                {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-              </div>
-            </div>
-          </div>
-          {onLogout && (
-            <button onClick={onLogout} className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 flex items-center justify-center transition-colors" title="Sair">
-              🚪
-            </button>
-          )}
-        </header>
-      )}
-
-      <main className={`flex-1 px-4 pb-28 max-w-5xl mx-auto w-full ${active === 'dashboard' ? '' : 'pt-2'}`}>
+      <main className="flex-1 px-4 pb-28 max-w-5xl mx-auto w-full">
         {children}
       </main>
 

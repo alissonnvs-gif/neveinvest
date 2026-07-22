@@ -5,8 +5,9 @@ import type { CardId } from '../config/cards'
 import type { PaymentMethod, FixedCost } from '../types'
 import CardSpendGoal from './CardSpendGoal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
+import { supabase } from '../lib/supabase'
 import {
-  IconClipboardList, IconChevronLeft, IconChevronRight, IconCreditCard,
+  IconBuildingBank, IconLogout, IconClipboardList, IconChevronLeft, IconChevronRight, IconCreditCard,
   IconCheck, IconX,
 } from '@tabler/icons-react'
 
@@ -227,20 +228,22 @@ export default function CustosFixos() {
   return (
     <div className="space-y-4">
       {/* Cabeçalho colorido com onda */}
-      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+      <div className="relative -mx-4 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
         <div className="relative flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-              <IconClipboardList size={17} color="#fff" />
+              <IconBuildingBank size={17} color="#fff" />
             </span>
-            <span className="font-bold text-sm text-white">Custos fixos</span>
+            <span className="font-bold text-sm text-white">NeveInvest</span>
           </div>
-          <span className="text-[11px] text-white/80">{(fixedCosts ?? []).filter((c) => c.active).length} ativos</span>
+          <button onClick={() => supabase.auth.signOut()} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white/90" title="Sair">
+            <IconLogout size={15} />
+          </button>
         </div>
 
         <div className="relative flex items-center justify-between gap-3 mb-4">
           <div className="flex-1">
-            <div className="text-[11px] text-white/80">Projetado — {monthLabel(selectedMonth)}</div>
+            <div className="text-[11px] text-white/80">Projetado — {monthLabel(selectedMonth)} · {(fixedCosts ?? []).filter((c) => c.active).length} ativos</div>
             <div className="text-2xl font-extrabold text-white">{fmt(totalProjected)}</div>
             <div className="text-[11px] text-white/70 mt-0.5">pago {fmt(totalPaid)} · pendente {fmt(totalPending)}</div>
           </div>
