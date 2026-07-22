@@ -4,7 +4,11 @@ import { fmt, fmtPct, currentMonth, monthLabel, CDI_MONTHLY, POUPANCA_MONTHLY, m
 import type { Investment, AporteSource } from '../types'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend } from 'recharts'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
-import GradientRing from './GradientRing'
+import {
+  IconChartLine, IconTrendingUp, IconCheck, IconX, IconWallet,
+} from '@tabler/icons-react'
+
+const PAGE_GRADIENT = 'linear-gradient(160deg, #10b981, #06b6d4)'
 
 const TYPES: Investment['type'][] = ['CDB', 'Tesouro Direto', 'LCI', 'LCA', 'Poupança', 'Ações', 'FII', 'Outro']
 
@@ -157,25 +161,31 @@ export default function Investimentos() {
   const alreadyLancedThisMonth = (invId: string) =>
     investmentRecords.some((r) => r.investmentId === invId && r.month === month)
 
-  return (
-    <div className="space-y-5">
+  const goalPct = annualGoal.targetValue > 0 ? Math.min(100, (totalInvested / annualGoal.targetValue) * 100) : 0
+  const ringR = 49
+  const ringC = 2 * Math.PI * ringR
+  const ringOffset = ringC - (goalPct / 100) * ringC
 
-      {/* Meta */}
-      <div className="relative bg-slate-800 rounded-3xl p-4 pt-5 overflow-hidden">
-        <div className="blob-accent w-64 h-64 -top-20 -right-20" />
-        <div className="relative flex justify-between items-start mb-2">
-          <div className="text-left">
-            <div className="text-xs text-slate-400">Meta {annualGoal.year}</div>
-            <h2 className="font-semibold text-slate-200">{fmt(annualGoal.targetValue)}</h2>
+  return (
+    <div className="space-y-4">
+      {/* Cabeçalho colorido com onda */}
+      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: PAGE_GRADIENT }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconChartLine size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">Investimentos</span>
           </div>
-          <button onClick={() => setEditMeta(!editMeta)} className="text-xs text-fuchsia-400 hover:text-fuchsia-300">
-            {editMeta ? 'Cancelar' : 'Editar'}
+          <button onClick={() => setEditMeta(!editMeta)} className="text-[11px] text-white/85 underline">
+            {editMeta ? 'cancelar' : 'editar meta'}
           </button>
         </div>
+
         {editMeta && (
-          <div className="relative flex gap-2 mb-3">
+          <div className="relative flex gap-2 mb-4">
             <input type="number" value={newMeta} onChange={(e) => setNewMeta(e.target.value)}
-              className="flex-1 bg-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-200 border border-slate-600" />
+              className="flex-1 bg-white/15 rounded-xl px-3 py-1.5 text-sm text-white placeholder-white/50 border border-white/25" />
             <button onClick={() => {
               const v = parseFloat(newMeta)
               if (isNaN(v) || v <= 0) {
@@ -186,35 +196,52 @@ export default function Investimentos() {
               showSuccessToast(`Meta anual atualizada para ${fmt(v)}.`)
               setEditMeta(false)
             }}
-              className="brand-gradient-bg text-white px-3 py-1.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity">Salvar</button>
+              className="bg-white text-emerald-700 px-3 py-1.5 rounded-full text-sm font-bold">Salvar</button>
           </div>
         )}
-        <div className="relative flex flex-col items-center py-2">
-          <GradientRing pct={annualGoal.targetValue > 0 ? (totalInvested / annualGoal.targetValue) * 100 : 0} size={120} />
+
+        <div className="relative text-center mb-1">
+          <div className="text-[11px] text-white/80">Meta {annualGoal.year}</div>
+          <div className="text-2xl font-extrabold text-white">{fmt(annualGoal.targetValue)}</div>
         </div>
-        <div className="relative grid grid-cols-3 gap-2 text-xs mt-2">
-          <div className="bg-slate-700 rounded-xl p-2 text-center">
-            <div className="text-slate-400">Atual</div>
-            <div className="text-emerald-400 font-bold">{fmt(totalInvested)}</div>
+
+        <div className="relative flex justify-center my-3">
+          <svg width={128} height={128} viewBox="0 0 128 128">
+            <circle cx={64} cy={64} r={ringR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={10} />
+            <circle cx={64} cy={64} r={ringR} fill="none" stroke="#fff" strokeWidth={10} strokeLinecap="round" strokeDasharray={ringC} strokeDashoffset={ringOffset} transform="rotate(-90 64 64)" />
+            <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 22 }}>{goalPct.toFixed(0)}%</text>
+            <text x="50%" y="63%" textAnchor="middle" dominantBaseline="central" className="fill-white/80" style={{ fontSize: 10 }}>{fmt(totalInvested)}</text>
+          </svg>
+        </div>
+
+        <div className="relative grid grid-cols-2 gap-2 mb-4">
+          <div className="bg-white/15 rounded-2xl p-2 text-center">
+            <div className="text-[10px] text-white/75">Aporte/mês necessário</div>
+            <div className="text-white font-bold text-sm">{fmt(monthlyNeeded)}</div>
           </div>
-          <div className="bg-slate-700 rounded-xl p-2 text-center">
-            <div className="text-slate-400">Aporte mensal</div>
-            <div className="text-blue-400 font-bold">{fmt(monthlyNeeded)}</div>
-          </div>
-          <div className="bg-slate-700 rounded-xl p-2 text-center">
-            <div className="text-slate-400">Falta</div>
-            <div className="text-amber-400 font-bold">{fmt(Math.max(0, gap))}</div>
+          <div className="bg-white/15 rounded-2xl p-2 text-center">
+            <div className="text-[10px] text-white/75">Falta pra meta</div>
+            <div className="text-white font-bold text-sm">{fmt(Math.max(0, gap))}</div>
           </div>
         </div>
+
+        <div className="h-8" />
+        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block" style={{ height: 74 }} preserveAspectRatio="none">
+          <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
+        </svg>
       </div>
+
+      {/* Corpo com leve degradê sutil */}
+      <div className="-mx-4 px-4" style={{ background: 'linear-gradient(180deg, #18132e 0%, rgba(52,43,84,0.55) 22%, #18132e 100%)' }}>
+      <div className="space-y-4 pt-1">
 
       {/* Receitas extraordinárias pendentes */}
       {(extraordinaryIncomes ?? []).some((e) => !e.received) && (
-        <div className="bg-slate-800 rounded-xl p-4">
-          <h2 className="font-semibold mb-3 text-slate-200">Receitas Extraordinárias</h2>
+        <div className="rounded-3xl p-4" style={{ background: 'rgba(93,202,165,0.08)', border: '1px solid rgba(93,202,165,0.2)' }}>
+          <h2 className="font-bold text-[13px] text-slate-100 mb-3">Receitas extraordinárias</h2>
           <div className="space-y-2">
             {(extraordinaryIncomes ?? []).filter((e) => !e.received).map((e) => (
-              <div key={e.id} className="bg-slate-700 rounded-lg p-3">
+              <div key={e.id} className="bg-slate-800 rounded-2xl p-3">
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="text-sm text-slate-200">{e.description}</div>
@@ -226,7 +253,7 @@ export default function Investimentos() {
                   </div>
                 </div>
                 <button onClick={() => setReceiveModal(e.id)}
-                  className="mt-2 w-full text-xs bg-emerald-700 hover:bg-emerald-600 py-1.5 rounded font-medium">
+                  className="mt-2 w-full text-xs bg-emerald-700 hover:bg-emerald-600 py-1.5 rounded-full font-medium">
                   Marcar como recebido
                 </button>
                 {receiveModal === e.id && (
@@ -234,7 +261,7 @@ export default function Investimentos() {
                     <input type="date" value={receiveDate} onChange={(ev) => setReceiveDate(ev.target.value)}
                       className="flex-1 bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200" />
                     <button onClick={() => { markExtraordinaryReceived(e.id, receiveDate); showSuccessToast(`${e.description} marcado como recebido.`); setReceiveModal(null) }}
-                      className="bg-emerald-600 hover:bg-emerald-500 px-3 rounded text-sm font-medium">OK</button>
+                      className="bg-emerald-600 hover:bg-emerald-500 px-3 rounded-full text-sm font-medium">OK</button>
                   </div>
                 )}
               </div>
@@ -245,13 +272,13 @@ export default function Investimentos() {
 
       {/* Gráfico evolução */}
       {portfolioHistory.length > 1 && (
-        <div className="bg-slate-800 rounded-xl p-4">
-          <h2 className="font-semibold mb-3 text-slate-200">Evolução da carteira</h2>
+        <div className="rounded-3xl p-4" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }}>
+          <h2 className="font-bold text-[13px] text-slate-100 mb-3">Evolução da carteira</h2>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={portfolioHistory}>
-              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }} />
+              <XAxis dataKey="name" tick={{ fill: '#948bc7', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#948bc7', fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: '#241e42', border: '1px solid #413764', borderRadius: 12 }} />
               <ReferenceLine y={annualGoal.targetValue} stroke="#f59e0b" strokeDasharray="4 4" />
               <Line type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981' }} name="Carteira" />
             </LineChart>
@@ -260,9 +287,9 @@ export default function Investimentos() {
       )}
 
       {/* Carteira */}
-      <div className="bg-slate-800 rounded-xl p-4">
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
         <div className="flex justify-between items-center mb-3">
-          <h2 className="font-semibold text-slate-200">Carteira</h2>
+          <h2 className="font-bold text-[13px] text-slate-100">Carteira</h2>
           <div className="flex gap-2">
             {(aportes ?? []).length > 0 && (
               <button onClick={() => { if (confirm('Zerar todos os aportes registrados? Os valores dos investimentos não serão alterados.')) { clearAportes(); showSuccessToast('Aportes zerados.') } }}
@@ -349,7 +376,7 @@ export default function Investimentos() {
             const isActive = activePanel?.invId === inv.id
 
             return (
-              <div key={inv.id} className="bg-slate-700 rounded-lg p-3">
+              <div key={inv.id} className="bg-slate-800 rounded-2xl p-3">
                 {/* Cabeçalho */}
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
@@ -373,7 +400,7 @@ export default function Investimentos() {
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   {lastRecord && (
                     <>
-                      <span className="bg-slate-600 rounded px-2 py-1">
+                      <span className="bg-slate-700 rounded-full px-2 py-1">
                         Rendimento: <span className={rendimento! >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(rendimento!)}</span>
                       </span>
                       <span className={`rounded px-2 py-1 ${vsBenchmark! >= 0 ? 'bg-emerald-900/50 text-emerald-400' : 'bg-amber-900/50 text-amber-400'}`}>
@@ -390,8 +417,8 @@ export default function Investimentos() {
 
                 {/* Alerta CDI */}
                 {mesesAbaixoCdi >= 2 && lastRecord && (
-                  <div className="mt-2 text-xs bg-amber-900/40 border border-amber-700 text-amber-200 rounded px-2 py-1.5">
-                    ⚠️ {mesesAbaixoCdi} meses consecutivos abaixo do CDI ({fmt(cdiRef)} seria o esperado). Avalie resgatar.
+                  <div className="mt-2 text-xs bg-amber-900/40 border border-amber-700 text-amber-200 rounded-xl px-2 py-1.5">
+                    {mesesAbaixoCdi} meses consecutivos abaixo do CDI ({fmt(cdiRef)} seria o esperado). Avalie resgatar.
                   </div>
                 )}
 
@@ -399,31 +426,31 @@ export default function Investimentos() {
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => setActivePanel(isActive && activePanel?.type === 'rendimento' ? null : { type: 'rendimento', invId: inv.id })}
-                    className={`flex-1 text-xs py-2 rounded font-medium transition-colors
+                    className={`flex-1 text-xs py-2 rounded-full font-medium transition-colors flex items-center justify-center gap-1
                       ${jaLancouMes ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-700' : 'bg-emerald-700 hover:bg-emerald-600 text-white'}`}
                   >
-                    {jaLancouMes ? '✓ Rendimento lançado' : '📊 Lançar rendimento'}
+                    {jaLancouMes ? <><IconCheck size={13} />Rendimento lançado</> : <><IconTrendingUp size={13} />Lançar rendimento</>}
                   </button>
                   <button
                     onClick={() => setActivePanel(isActive && activePanel?.type === 'aporte' ? null : { type: 'aporte', invId: inv.id })}
-                    className="flex-1 text-xs bg-blue-700 hover:bg-blue-600 py-2 rounded font-medium"
+                    className="flex-1 text-xs bg-blue-700 hover:bg-blue-600 py-2 rounded-full font-medium flex items-center justify-center gap-1"
                   >
-                    💰 Fazer aporte
+                    <IconWallet size={13} />Fazer aporte
                   </button>
                   <button onClick={() => setSelectedInv(selectedInv === inv.id ? null : inv.id)}
-                    className="text-xs bg-slate-600 hover:bg-slate-500 px-3 py-2 rounded font-medium">
-                    📈
+                    className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-full font-medium">
+                    <IconChartLine size={13} />
                   </button>
-                  <button onClick={() => { removeInvestment(inv.id); showSuccessToast(`${inv.name} removido.`) }} className="text-xs text-slate-500 hover:text-red-400 px-2">✕</button>
+                  <button onClick={() => { removeInvestment(inv.id); showSuccessToast(`${inv.name} removido.`) }} className="text-xs text-slate-500 hover:text-red-400 px-2"><IconX size={13} /></button>
                 </div>
 
                 {/* Painel: lançar rendimento */}
                 {isActive && activePanel?.type === 'rendimento' && (
-                  <div className="mt-3 bg-slate-600 rounded-lg p-3 space-y-3">
-                    <div className="text-xs font-medium text-emerald-300">
-                      📊 Rendimento de {monthLabel(month)}
+                  <div className="mt-3 bg-slate-700 rounded-2xl p-3 space-y-3">
+                    <div className="text-xs font-medium text-emerald-300 flex items-center gap-1">
+                      <IconTrendingUp size={13} />Rendimento de {monthLabel(month)}
                     </div>
-                    <div className="text-xs text-slate-400 bg-slate-700 rounded px-3 py-2">
+                    <div className="text-xs text-slate-400 bg-slate-800 rounded-xl px-3 py-2">
                       Valor anterior: <span className="text-slate-200 font-medium">{fmt(inv.currentValue)}</span>
                     </div>
                     <div>
@@ -451,7 +478,7 @@ export default function Investimentos() {
                       )}
                     </div>
                     <button onClick={() => submitRendimento(inv.id)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 py-2 rounded text-sm font-medium">
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 py-2 rounded-full text-sm font-medium">
                       Confirmar rendimento
                     </button>
                   </div>
@@ -459,9 +486,9 @@ export default function Investimentos() {
 
                 {/* Painel: fazer aporte */}
                 {isActive && activePanel?.type === 'aporte' && (
-                  <div className="mt-3 bg-slate-600 rounded-lg p-3 space-y-3">
-                    <div className="text-xs font-medium text-blue-300">
-                      💰 Novo aporte em {inv.name}
+                  <div className="mt-3 bg-slate-700 rounded-2xl p-3 space-y-3">
+                    <div className="text-xs font-medium text-blue-300 flex items-center gap-1">
+                      <IconWallet size={13} />Novo aporte em {inv.name}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -490,7 +517,7 @@ export default function Investimentos() {
                     <input value={aporteForm.description} onChange={(e) => setAporteForm((f) => ({ ...f, description: e.target.value }))}
                       placeholder="Observação (opcional)" className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600" />
                     <button onClick={() => submitAporte(inv.id)}
-                      className="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm font-medium">
+                      className="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-full text-sm font-medium">
                       Confirmar aporte
                     </button>
 
@@ -538,6 +565,22 @@ export default function Investimentos() {
             )
           })}
         </div>
+      </div>
+
+      </div>
+
+      {/* Fecho da página — colina decorativa */}
+      <div className="relative -mx-4 mt-2">
+        <svg viewBox="0 0 320 60" className="w-full block" style={{ height: 60 }} preserveAspectRatio="none">
+          <path d="M0,60 L0,30 C 70,5 110,45 180,25 C 240,8 280,35 320,20 L320,60 Z" fill="#241e42" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-2.5">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center mb-1" style={{ background: PAGE_GRADIENT, boxShadow: '0 4px 14px rgba(16,185,129,0.4)' }}>
+            <IconChartLine size={16} color="#fff" />
+          </span>
+          <span className="text-[10px] font-bold text-slate-200">Tudo em dia por aqui</span>
+        </div>
+      </div>
       </div>
     </div>
   )
