@@ -4,6 +4,7 @@ import { fmt, fmtPct, currentMonth, monthLabel, CDI_MONTHLY, POUPANCA_MONTHLY, m
 import type { Investment, AporteSource } from '../types'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend } from 'recharts'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
+import GradientRing from './GradientRing'
 
 const TYPES: Investment['type'][] = ['CDB', 'Tesouro Direto', 'LCI', 'LCA', 'Poupança', 'Ações', 'FII', 'Outro']
 
@@ -160,15 +161,19 @@ export default function Investimentos() {
     <div className="space-y-5">
 
       {/* Meta */}
-      <div className="bg-slate-800 rounded-2xl p-4">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold text-slate-200">Meta {annualGoal.year}: {fmt(annualGoal.targetValue)}</h2>
+      <div className="relative bg-slate-800 rounded-3xl p-4 pt-5 overflow-hidden">
+        <div className="blob-accent w-64 h-64 -top-20 -right-20" />
+        <div className="relative flex justify-between items-start mb-2">
+          <div className="text-left">
+            <div className="text-xs text-slate-400">Meta {annualGoal.year}</div>
+            <h2 className="font-semibold text-slate-200">{fmt(annualGoal.targetValue)}</h2>
+          </div>
           <button onClick={() => setEditMeta(!editMeta)} className="text-xs text-fuchsia-400 hover:text-fuchsia-300">
             {editMeta ? 'Cancelar' : 'Editar'}
           </button>
         </div>
         {editMeta && (
-          <div className="flex gap-2 mb-3">
+          <div className="relative flex gap-2 mb-3">
             <input type="number" value={newMeta} onChange={(e) => setNewMeta(e.target.value)}
               className="flex-1 bg-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-200 border border-slate-600" />
             <button onClick={() => {
@@ -184,19 +189,19 @@ export default function Investimentos() {
               className="brand-gradient-bg text-white px-3 py-1.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity">Salvar</button>
           </div>
         )}
-        <div className="h-4 bg-slate-700 rounded-full overflow-hidden mb-3">
-          <div className="h-full brand-gradient-bg transition-all" style={{ width: `${annualGoal.targetValue > 0 ? Math.min((totalInvested / annualGoal.targetValue) * 100, 100) : 0}%` }} />
+        <div className="relative flex flex-col items-center py-2">
+          <GradientRing pct={annualGoal.targetValue > 0 ? (totalInvested / annualGoal.targetValue) * 100 : 0} size={120} />
         </div>
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <div className="bg-slate-700 rounded p-2 text-center">
+        <div className="relative grid grid-cols-3 gap-2 text-xs mt-2">
+          <div className="bg-slate-700 rounded-xl p-2 text-center">
             <div className="text-slate-400">Atual</div>
             <div className="text-emerald-400 font-bold">{fmt(totalInvested)}</div>
           </div>
-          <div className="bg-slate-700 rounded p-2 text-center">
+          <div className="bg-slate-700 rounded-xl p-2 text-center">
             <div className="text-slate-400">Aporte mensal</div>
             <div className="text-blue-400 font-bold">{fmt(monthlyNeeded)}</div>
           </div>
-          <div className="bg-slate-700 rounded p-2 text-center">
+          <div className="bg-slate-700 rounded-xl p-2 text-center">
             <div className="text-slate-400">Falta</div>
             <div className="text-amber-400 font-bold">{fmt(Math.max(0, gap))}</div>
           </div>

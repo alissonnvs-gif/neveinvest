@@ -24,8 +24,14 @@ body {
   position: absolute;
   border-radius: 60% 40% 55% 45% / 45% 55% 45% 55%;
   background: linear-gradient(135deg, #7c3aed, #d946ef 55%, #f97316);
-  filter: blur(2px);
-  opacity: 0.18;
+  filter: blur(6px);
+  opacity: 0.22;
   pointer-events: none;
   z-index: 0;
+  animation: blob-float 9s ease-in-out infinite;
+}
+
+@keyframes blob-float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(3%, -4%) rotate(8deg) scale(1.06); }
 }

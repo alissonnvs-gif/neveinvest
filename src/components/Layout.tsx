@@ -22,49 +22,52 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 export default function Layout({ active, onChange, children, draftsCount = 0, onLogout }: Props) {
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-slate-900/80 backdrop-blur border-b border-slate-700/60 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🏦</span>
-          <span className="font-bold text-lg brand-gradient-text">NeveInvest</span>
+      <header className="px-4 pt-4 pb-2 flex items-center justify-between max-w-5xl mx-auto w-full">
+        <div className="flex items-center gap-2.5">
+          <span className="w-10 h-10 rounded-full brand-gradient-bg flex items-center justify-center text-lg shadow-lg shadow-fuchsia-900/30 flex-shrink-0">🏦</span>
+          <div className="leading-tight">
+            <div className="font-bold text-base brand-gradient-text">NeveInvest</div>
+            <div className="text-[11px] text-slate-500 capitalize">
+              {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">
-            {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-          </span>
-          {onLogout && (
-            <button onClick={onLogout} className="text-xs text-slate-500 hover:text-red-400" title="Sair">
-              🚪 Sair
-            </button>
-          )}
-        </div>
+        {onLogout && (
+          <button onClick={onLogout} className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 flex items-center justify-center transition-colors" title="Sair">
+            🚪
+          </button>
+        )}
       </header>
 
-      <nav className="bg-slate-900/60 border-b border-slate-700/60 flex gap-1 px-2 py-2 overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => onChange(t.id)}
-            className={`relative flex-1 min-w-[64px] py-2.5 text-sm font-medium transition-all flex flex-col items-center gap-1 rounded-2xl
-              ${active === t.id
-                ? 'text-white brand-gradient-bg shadow-lg shadow-fuchsia-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'}`}
-          >
-            <span className="relative">
-              {t.icon}
-              {t.id === 'rascunhos' && draftsCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-                  {draftsCount}
-                </span>
-              )}
-            </span>
-            <span className="hidden sm:block">{t.label}</span>
-          </button>
-        ))}
-      </nav>
-
-      <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
+      <main className="flex-1 px-4 pt-2 pb-28 max-w-5xl mx-auto w-full">
         {children}
       </main>
+
+      <nav className="fixed bottom-0 left-0 right-0 flex justify-center px-3 pb-3 pt-1 pointer-events-none z-40">
+        <div className="pointer-events-auto flex gap-0.5 bg-slate-900/90 backdrop-blur border border-slate-700/60 rounded-full px-1.5 py-1.5 shadow-2xl shadow-black/40 max-w-full overflow-x-auto">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => onChange(t.id)}
+              title={t.label}
+              className={`relative flex-shrink-0 w-11 h-11 sm:w-auto sm:px-4 rounded-full text-base font-medium transition-all flex items-center justify-center gap-1.5
+                ${active === t.id
+                  ? 'text-white brand-gradient-bg shadow-lg shadow-fuchsia-900/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+            >
+              <span className="relative">
+                {t.icon}
+                {t.id === 'rascunhos' && draftsCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                    {draftsCount}
+                  </span>
+                )}
+              </span>
+              <span className="hidden sm:block text-sm">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   )
 }

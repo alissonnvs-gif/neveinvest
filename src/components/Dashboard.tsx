@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import InsightsCard from './InsightsCard'
 import CardSpendGoal from './CardSpendGoal'
+import GradientRing from './GradientRing'
 import { fmt, fmtPct, currentMonth, monthLabel, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, computeBenefitBalance, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
 import {
   AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -151,41 +152,46 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      {/* Cards de resumo rápido */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-slate-800 rounded-xl p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs text-slate-400">Saldo em Conta</span>
-            <button onClick={toggleHideSaldo} className="text-slate-500 hover:text-slate-300 transition-colors text-xs" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
-              {hideSaldo ? '👁️' : '🙈'}
-            </button>
-          </div>
-          <div className={`text-lg font-bold ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {hideSaldo ? '••••••' : fmt(saldo)}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">rendas − gastos − aportes</div>
+      {/* Hero: saldo em conta */}
+      <div className="relative brand-gradient-bg rounded-3xl p-5 overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute bottom-0 left-0 right-0 h-10 opacity-90" style={{
+          background: 'radial-gradient(120% 100% at 50% 100%, rgba(24,19,46,0.55), transparent 70%)'
+        }} />
+        <div className="relative flex items-center gap-1.5 mb-1">
+          <span className="text-sm text-white/80">Saldo em Conta</span>
+          <button onClick={toggleHideSaldo} className="text-white/70 hover:text-white transition-colors text-xs" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
+            {hideSaldo ? '👁️' : '🙈'}
+          </button>
         </div>
-        <Card label="Gasto efetivo" value={fmt(totalSpent)} sub="pix · boleto · faturas" color="yellow" />
-        <Card label="Gastos no Cartão" value={fmt(cardSpent)} sub={`meta ${fmt(limit)}`} color="purple" />
-        <Card label="Carteira total" value={fmt(totalInvested)} sub={`${goalPct.toFixed(1)}% da meta`} color="blue" />
+        <div className="relative text-4xl font-black text-white tracking-tight">
+          {hideSaldo ? '••••••' : fmt(saldo)}
+        </div>
+        <div className="relative text-xs text-white/70 mt-1">rendas − gastos − aportes</div>
+      </div>
+
+      {/* Cards de resumo — chips com ícone circular */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatChip icon="💸" label="Gasto efetivo" value={fmt(totalSpent)} sub="pix·boleto·faturas" />
+        <StatChip icon="💳" label="No Cartão" value={fmt(cardSpent)} sub={`meta ${fmt(limit)}`} />
+        <StatChip icon="📈" label="Carteira" value={fmt(totalInvested)} sub={`${goalPct.toFixed(1)}% da meta`} />
       </div>
 
       {/* ── INSIGHTS DO DIA ── */}
       <InsightsCard />
 
       {/* ── MISSÃO: META R$500k ── */}
-      <div className="relative bg-slate-800 rounded-2xl p-5 overflow-hidden">
-        <div className="blob-accent w-56 h-56 -top-16 -right-16" />
-        <div className="relative flex items-center justify-between gap-4 mb-1">
-          <div className="flex-1">
-            <h2 className="font-bold text-base text-slate-100">🎯 Missão: {fmt(target)} até Dez/{annualGoal.year}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Cada mês conta. Todo aporte te aproxima.</p>
-          </div>
-          <GradientRing pct={goalPct} size={84} />
+      <div className="relative bg-slate-800 rounded-3xl p-5 pt-6 overflow-hidden">
+        <div className="blob-accent w-72 h-72 -top-24 -left-20" />
+        <div className="blob-accent w-56 h-56 -bottom-20 -right-16" style={{ animationDelay: '2s' }} />
+        <div className="relative flex flex-col items-center text-center">
+          <GradientRing pct={goalPct} size={148} />
+          <h2 className="font-bold text-base text-slate-100 mt-3">🎯 Missão {fmt(target)}</h2>
+          <p className="text-xs text-slate-400 mt-0.5">até Dez/{annualGoal.year} · Cada mês conta, todo aporte te aproxima.</p>
         </div>
 
         {/* Barra principal */}
-        <div className="relative mt-4 mb-2">
+        <div className="relative mt-5 mb-2">
           <div className="relative h-7 bg-slate-700 rounded-full overflow-visible">
             {/* Marcos */}
             {milestones.map((m) => (
@@ -402,16 +408,13 @@ export default function Dashboard() {
   )
 }
 
-function Card({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
-  const colors: Record<string, string> = {
-    green: 'text-emerald-400', red: 'text-red-400', blue: 'text-blue-400',
-    purple: 'text-purple-400', yellow: 'text-yellow-400',
-  }
+function StatChip({ icon, label, value, sub }: { icon: string; label: string; value: string; sub: string }) {
   return (
-    <div className="bg-slate-800 rounded-xl p-3">
-      <div className="text-xs text-slate-400 mb-1">{label}</div>
-      <div className={`text-lg font-bold ${colors[color]}`}>{value}</div>
-      <div className="text-xs text-slate-500 mt-1">{sub}</div>
+    <div className="bg-slate-800 rounded-2xl p-3 flex flex-col items-center text-center gap-1">
+      <span className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-base">{icon}</span>
+      <div className="text-xs text-slate-400 leading-tight">{label}</div>
+      <div className="text-sm font-bold text-slate-100 leading-tight">{value}</div>
+      <div className="text-[10px] text-slate-500 leading-tight">{sub}</div>
     </div>
   )
 }
@@ -423,35 +426,6 @@ function BenchmarkCard({ label, value, pct }: { label: string; value: string; pc
       <div className="text-emerald-400 font-bold">{value}</div>
       <div className="text-xs text-slate-400">{pct}</div>
     </div>
-  )
-}
-
-function GradientRing({ pct, size = 84 }: { pct: number; size?: number }) {
-  const stroke = 8
-  const r = (size - stroke) / 2
-  const c = 2 * Math.PI * r
-  const clamped = Math.min(100, Math.max(0, pct))
-  const gradId = 'ring-grad'
-  return (
-    <svg width={size} height={size} className="flex-shrink-0">
-      <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="55%" stopColor="#d946ef" />
-          <stop offset="100%" stopColor="#f97316" />
-        </linearGradient>
-      </defs>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#413764" strokeWidth={stroke} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke={`url(#${gradId})`} strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={c} strokeDashoffset={c - (clamped / 100) * c}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-slate-100 font-black" style={{ fontSize: size * 0.2 }}>
-        {clamped.toFixed(0)}%
-      </text>
-    </svg>
   )
 }
 
