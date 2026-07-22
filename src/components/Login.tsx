@@ -64,10 +64,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-slate-800 rounded-xl p-6">
+      <div className="w-full max-w-sm bg-slate-800 rounded-2xl p-6">
         <div className="text-center mb-6">
           <div className="text-3xl mb-1">🏦</div>
-          <div className="font-bold text-lg text-emerald-400">NeveInvest</div>
+          <div className="font-bold text-lg brand-gradient-text">NeveInvest</div>
         </div>
 
         {step === 'credentials' ? (
@@ -79,7 +79,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600"
+                className="w-full bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 border border-slate-600"
                 autoFocus
               />
             </div>
@@ -90,14 +90,14 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600"
+                className="w-full bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 border border-slate-600"
               />
             </div>
             {error && <div className="text-xs text-red-400 bg-red-900/30 border border-red-800/50 rounded px-3 py-2">{error}</div>}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium"
+              className="w-full brand-gradient-bg hover:opacity-90 disabled:opacity-50 py-2.5 rounded-full text-sm font-medium text-white transition-opacity"
             >
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
@@ -115,7 +115,7 @@ export default function Login() {
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600 tracking-widest text-center text-lg"
+                className="w-full bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 border border-slate-600 tracking-widest text-center text-lg"
                 autoFocus
                 maxLength={6}
               />
@@ -124,7 +124,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium"
+              className="w-full brand-gradient-bg hover:opacity-90 disabled:opacity-50 py-2.5 rounded-full text-sm font-medium text-white transition-opacity"
             >
               {loading ? 'Confirmando...' : 'Confirmar código'}
             </button>

@@ -174,20 +174,18 @@ export default function Dashboard() {
       <InsightsCard />
 
       {/* ── MISSÃO: META R$500k ── */}
-      <div className="bg-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-1">
-          <div>
+      <div className="relative bg-slate-800 rounded-2xl p-5 overflow-hidden">
+        <div className="blob-accent w-56 h-56 -top-16 -right-16" />
+        <div className="relative flex items-center justify-between gap-4 mb-1">
+          <div className="flex-1">
             <h2 className="font-bold text-base text-slate-100">🎯 Missão: {fmt(target)} até Dez/{annualGoal.year}</h2>
             <p className="text-xs text-slate-400 mt-0.5">Cada mês conta. Todo aporte te aproxima.</p>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-black text-emerald-400">{goalPct.toFixed(1)}%</div>
-            <div className="text-xs text-slate-400">concluído</div>
-          </div>
+          <GradientRing pct={goalPct} size={84} />
         </div>
 
         {/* Barra principal */}
-        <div className="mt-4 mb-2">
+        <div className="relative mt-4 mb-2">
           <div className="relative h-7 bg-slate-700 rounded-full overflow-visible">
             {/* Marcos */}
             {milestones.map((m) => (
@@ -196,12 +194,12 @@ export default function Dashboard() {
                 className="absolute top-0 h-full flex flex-col items-center"
                 style={{ left: `${m.pct}%`, transform: 'translateX(-50%)' }}
               >
-                <div className={`h-full w-px ${goalPct >= m.pct ? 'bg-emerald-600' : 'bg-slate-600'}`} />
+                <div className={`h-full w-px ${goalPct >= m.pct ? 'bg-fuchsia-500' : 'bg-slate-600'}`} />
               </div>
             ))}
             {/* Barra de progresso atual */}
             <div
-              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-700 relative"
+              className="h-full brand-gradient-bg rounded-full transition-all duration-700 relative"
               style={{ width: `${goalPct}%` }}
             >
               {goalPct > 5 && (
@@ -227,7 +225,7 @@ export default function Dashboard() {
                 className="absolute flex flex-col items-center"
                 style={{ left: `${m.pct}%`, transform: 'translateX(-50%)' }}
               >
-                <span className={`text-xs ${goalPct >= m.pct ? 'text-emerald-400 font-semibold' : 'text-slate-600'}`}>
+                <span className={`text-xs ${goalPct >= m.pct ? 'text-fuchsia-400 font-semibold' : 'text-slate-600'}`}>
                   {m.label}
                 </span>
               </div>
@@ -425,6 +423,35 @@ function BenchmarkCard({ label, value, pct }: { label: string; value: string; pc
       <div className="text-emerald-400 font-bold">{value}</div>
       <div className="text-xs text-slate-400">{pct}</div>
     </div>
+  )
+}
+
+function GradientRing({ pct, size = 84 }: { pct: number; size?: number }) {
+  const stroke = 8
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const clamped = Math.min(100, Math.max(0, pct))
+  const gradId = 'ring-grad'
+  return (
+    <svg width={size} height={size} className="flex-shrink-0">
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#7c3aed" />
+          <stop offset="55%" stopColor="#d946ef" />
+          <stop offset="100%" stopColor="#f97316" />
+        </linearGradient>
+      </defs>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#413764" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={`url(#${gradId})`} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c - (clamped / 100) * c}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-slate-100 font-black" style={{ fontSize: size * 0.2 }}>
+        {clamped.toFixed(0)}%
+      </text>
+    </svg>
   )
 }
 

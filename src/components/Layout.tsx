@@ -22,10 +22,10 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 export default function Layout({ active, onChange, children, draftsCount = 0, onLogout }: Props) {
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-slate-900 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
+      <header className="bg-slate-900/80 backdrop-blur border-b border-slate-700/60 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🏦</span>
-          <span className="font-bold text-lg text-emerald-400">NeveInvest</span>
+          <span className="font-bold text-lg brand-gradient-text">NeveInvest</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400">
@@ -39,15 +39,15 @@ export default function Layout({ active, onChange, children, draftsCount = 0, on
         </div>
       </header>
 
-      <nav className="bg-slate-800 border-b border-slate-700 flex">
+      <nav className="bg-slate-900/60 border-b border-slate-700/60 flex gap-1 px-2 py-2 overflow-x-auto">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => onChange(t.id)}
-            className={`relative flex-1 py-3 text-sm font-medium transition-colors flex flex-col items-center gap-1
+            className={`relative flex-1 min-w-[64px] py-2.5 text-sm font-medium transition-all flex flex-col items-center gap-1 rounded-2xl
               ${active === t.id
-                ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900'
-                : 'text-slate-400 hover:text-slate-200'}`}
+                ? 'text-white brand-gradient-bg shadow-lg shadow-fuchsia-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'}`}
           >
             <span className="relative">
               {t.icon}

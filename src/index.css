@@ -1,9 +1,31 @@
 body {
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: #18132e;
+  color: #eeecf8;
   font-family: 'Inter', system-ui, sans-serif;
 }
 
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #1e293b; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #292144; }
+::-webkit-scrollbar-thumb { background: #413764; border-radius: 3px; }
+
+.brand-gradient-text {
+  background: linear-gradient(90deg, #a78bfa, #e879f9, #fb923c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-gradient-bg {
+  background: linear-gradient(90deg, #7c3aed, #d946ef, #f97316);
+}
+
+/* Mancha orgânica decorativa, usada atrás de cards de destaque */
+.blob-accent {
+  position: absolute;
+  border-radius: 60% 40% 55% 45% / 45% 55% 45% 55%;
+  background: linear-gradient(135deg, #7c3aed, #d946ef 55%, #f97316);
+  filter: blur(2px);
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}

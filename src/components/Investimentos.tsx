@@ -18,8 +18,8 @@ const SOURCES: { value: AporteSource; label: string; icon: string }[] = [
 ]
 
 const TYPE_COLORS: Record<string, string> = {
-  'CDB': '#10b981', 'Tesouro Direto': '#3b82f6', 'LCI': '#f59e0b',
-  'LCA': '#8b5cf6', 'Poupança': '#06b6d4', 'Ações': '#ef4444',
+  'CDB': '#7c3aed', 'Tesouro Direto': '#3b82f6', 'LCI': '#f59e0b',
+  'LCA': '#d946ef', 'Poupança': '#06b6d4', 'Ações': '#ef4444',
   'FII': '#f97316', 'Outro': '#6b7280',
 }
 
@@ -160,17 +160,17 @@ export default function Investimentos() {
     <div className="space-y-5">
 
       {/* Meta */}
-      <div className="bg-slate-800 rounded-xl p-4">
+      <div className="bg-slate-800 rounded-2xl p-4">
         <div className="flex justify-between items-center mb-2">
           <h2 className="font-semibold text-slate-200">Meta {annualGoal.year}: {fmt(annualGoal.targetValue)}</h2>
-          <button onClick={() => setEditMeta(!editMeta)} className="text-xs text-emerald-400 hover:text-emerald-300">
+          <button onClick={() => setEditMeta(!editMeta)} className="text-xs text-fuchsia-400 hover:text-fuchsia-300">
             {editMeta ? 'Cancelar' : 'Editar'}
           </button>
         </div>
         {editMeta && (
           <div className="flex gap-2 mb-3">
             <input type="number" value={newMeta} onChange={(e) => setNewMeta(e.target.value)}
-              className="flex-1 bg-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 border border-slate-600" />
+              className="flex-1 bg-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-200 border border-slate-600" />
             <button onClick={() => {
               const v = parseFloat(newMeta)
               if (isNaN(v) || v <= 0) {
@@ -181,11 +181,11 @@ export default function Investimentos() {
               showSuccessToast(`Meta anual atualizada para ${fmt(v)}.`)
               setEditMeta(false)
             }}
-              className="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded text-sm font-medium">Salvar</button>
+              className="brand-gradient-bg text-white px-3 py-1.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity">Salvar</button>
           </div>
         )}
         <div className="h-4 bg-slate-700 rounded-full overflow-hidden mb-3">
-          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${annualGoal.targetValue > 0 ? Math.min((totalInvested / annualGoal.targetValue) * 100, 100) : 0}%` }} />
+          <div className="h-full brand-gradient-bg transition-all" style={{ width: `${annualGoal.targetValue > 0 ? Math.min((totalInvested / annualGoal.targetValue) * 100, 100) : 0}%` }} />
         </div>
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="bg-slate-700 rounded p-2 text-center">
@@ -266,7 +266,7 @@ export default function Investimentos() {
               </button>
             )}
             <button onClick={() => setShowAporteNew(!showAporteNew)}
-              className="text-xs bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded font-medium">
+              className="text-xs brand-gradient-bg text-white hover:opacity-90 transition-opacity px-3 py-1.5 rounded-full font-medium">
               + Novo investimento
             </button>
           </div>
@@ -314,7 +314,7 @@ export default function Investimentos() {
                 ))}
               </div>
             </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm font-medium">
+            <button type="submit" className="w-full brand-gradient-bg text-white hover:opacity-90 transition-opacity py-2 rounded-full text-sm font-medium">
               Criar e aplicar
             </button>
           </form>
