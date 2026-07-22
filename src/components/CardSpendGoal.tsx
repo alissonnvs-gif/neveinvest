@@ -14,12 +14,12 @@ interface CardSpendGoalProps {
 }
 
 const TIERS = [
-  { max: 25, color: 'from-emerald-600 to-emerald-400', text: 'text-emerald-400', msg: '😌 Tranquilo, base baixa' },
-  { max: 50, color: 'from-emerald-500 to-lime-400', text: 'text-lime-400', msg: '🙂 Ritmo OK — mantenha o pé leve' },
-  { max: 70, color: 'from-amber-500 to-amber-400', text: 'text-amber-400', msg: '😬 Metade da meta — ainda dá pra segurar' },
-  { max: 85, color: 'from-orange-500 to-orange-400', text: 'text-orange-400', msg: '⚠️ Fatura engordando — atenção' },
-  { max: 100, color: 'from-red-600 to-red-500', text: 'text-red-400', msg: '🔥 Quase estourando — freia!' },
-  { max: Infinity, color: 'from-red-800 to-red-600', text: 'text-red-500', msg: '💥 Meta estourada — hora de recalcular' },
+  { max: 25, color: 'from-emerald-600 to-emerald-400', text: 'text-emerald-400', msg: 'Tranquilo, base baixa' },
+  { max: 50, color: 'from-emerald-500 to-lime-400', text: 'text-lime-400', msg: 'Ritmo OK — mantenha o pé leve' },
+  { max: 70, color: 'from-amber-500 to-amber-400', text: 'text-amber-400', msg: 'Metade da meta — ainda dá pra segurar' },
+  { max: 85, color: 'from-orange-500 to-orange-400', text: 'text-orange-400', msg: 'Fatura engordando — atenção' },
+  { max: 100, color: 'from-red-600 to-red-500', text: 'text-red-400', msg: 'Quase estourando — freia!' },
+  { max: Infinity, color: 'from-red-800 to-red-600', text: 'text-red-500', msg: 'Meta estourada — hora de recalcular' },
 ]
 
 function getTier(pct: number) {
@@ -38,7 +38,7 @@ export default function CardSpendGoal({ spent, limit, weeklySpent, slim, monthLa
     return (
       <div>
         <div className="flex items-center justify-between mb-1 text-xs">
-          <span className="text-slate-400">🛑 Meta de Cartão{monthLabelText ? ` — ${monthLabelText}` : ''}</span>
+          <span className="text-slate-400">Meta de cartão{monthLabelText ? ` — ${monthLabelText}` : ''}</span>
           <span className={`font-semibold ${tier.text}`}>{pct.toFixed(0)}%</span>
         </div>
         <div className="flex items-center gap-2">
@@ -56,9 +56,9 @@ export default function CardSpendGoal({ spent, limit, weeklySpent, slim, monthLa
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl p-4">
+    <div className="rounded-3xl p-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)' }}>
       <div className="flex items-center justify-between mb-1">
-        <h2 className="font-semibold text-slate-200">🛑 Meta de Gastos no Cartão{monthLabelText ? ` — ${monthLabelText}` : ''}</h2>
+        <h2 className="font-bold text-[13px] text-slate-100">Meta de gastos no cartão{monthLabelText ? ` — ${monthLabelText}` : ''}</h2>
         <div className="flex items-center gap-2">
           <span className={`text-sm font-bold ${tier.text}`}>{pct.toFixed(0)}%</span>
           {headerRight}
@@ -87,7 +87,7 @@ export default function CardSpendGoal({ spent, limit, weeklySpent, slim, monthLa
 
       {paid !== undefined && (
         <div className={`text-xs font-medium mt-1.5 ${paid ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {paid ? '✅ Fatura paga' : '🕒 Fatura ainda não paga'}
+          {paid ? 'Fatura paga' : 'Fatura ainda não paga'}
         </div>
       )}
 
@@ -97,8 +97,8 @@ export default function CardSpendGoal({ spent, limit, weeklySpent, slim, monthLa
             {weeklySpent.map((v, i) => {
               const isCritical = maxWeek > 0 && v === maxWeek && v > fairShare
               return (
-                <div key={i} className={`rounded-lg px-2 py-1.5 text-center ${isCritical ? 'bg-red-900/40 border border-red-700/50' : 'bg-slate-700/60'}`}>
-                  <div className={`text-[10px] ${isCritical ? 'text-red-400' : 'text-slate-500'}`}>Sem {i + 1}{isCritical ? ' 🔥' : ''}</div>
+                <div key={i} className={`rounded-2xl px-2 py-1.5 text-center ${isCritical ? 'bg-red-900/40 border border-red-700/50' : 'bg-slate-700/60'}`}>
+                  <div className={`text-[10px] ${isCritical ? 'text-red-400' : 'text-slate-500'}`}>Sem {i + 1}</div>
                   <div className={`text-xs font-semibold ${isCritical ? 'text-red-300' : 'text-slate-300'}`}>{fmt(v)}</div>
                 </div>
               )
@@ -106,7 +106,7 @@ export default function CardSpendGoal({ spent, limit, weeklySpent, slim, monthLa
           </div>
           {maxWeek > fairShare && (
             <p className="text-[11px] text-red-400 mt-2">
-              📌 Semana {heaviestWeekIdx + 1} foi o período mais crítico — passou da cota semanal de {fmt(fairShare)}.
+              Semana {heaviestWeekIdx + 1} foi o período mais crítico — passou da cota semanal de {fmt(fairShare)}.
             </p>
           )}
         </>

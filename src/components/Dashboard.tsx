@@ -2,13 +2,9 @@ import type { ReactNode, CSSProperties } from 'react'
 import { useStore } from '../store'
 import InsightsCard from './InsightsCard'
 import CardSpendGoal from './CardSpendGoal'
-import { fmt, fmtPct, currentMonth, monthLabel, addMonths, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
+import { fmt, currentMonth, monthLabel, addMonths, CDI_MONTHLY, monthsRemaining, computeSaldo, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
 import { supabase } from '../lib/supabase'
-import {
-  Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
-  LineChart, ReferenceLine, Legend,
-} from 'recharts'
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import {
   IconBuildingBank, IconLogout, IconFlame, IconReceipt, IconCreditCard,
   IconTrendingUp, IconEye, IconEyeOff, IconStar, IconFlag2,
@@ -246,16 +242,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Benchmarks */}
-          <div className="rounded-3xl p-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)' }}>
-            <h2 className="font-bold text-[13px] text-slate-100 mb-3">Referência mensal sobre {fmt(totalInvested)}</h2>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <BenchmarkCard label="CDI (10.75% aa)" value={fmt(totalInvested * CDI_MONTHLY)} pct={fmtPct(CDI_MONTHLY * 100)} />
-              <BenchmarkCard label="Poupança (6.17% aa)" value={fmt(totalInvested * POUPANCA_MONTHLY)} pct={fmtPct(POUPANCA_MONTHLY * 100)} />
-              <BenchmarkCard label="Aporte necessário" value={fmt(monthlyNeeded)} pct="/mês" />
-            </div>
-          </div>
-
           {/* Aviso: fatura já fechada (não aceita mais compras) mas ainda não paga */}
           {overdueCards.length > 0 && (
             <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl px-3 py-2 text-xs text-amber-300 space-y-1">
@@ -277,17 +263,29 @@ export default function Dashboard() {
           <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
             <h2 className="font-bold text-[13px] text-slate-100 mb-1">Gastos no cartão por semana — {monthLabel(cardMonth)}</h2>
             <p className="text-[11px] text-slate-400 mb-3">{CARDS.map((c) => c.label).join(' + ')} · meta ÷ 4 ({fmt(limit / 4)}/semana)</p>
-            <ResponsiveContainer width="100%" height={170}>
-              <LineChart data={weeklySpending}>
-                <XAxis dataKey="name" tick={{ fill: '#948bc7', fontSize: 11 }} />
-                <YAxis tick={{ fill: '#948bc7', fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(1)}k`} domain={[0, Math.max(limit / 4 * 1.3, ...weeklySpending.map((w) => w.gasto))]} />
-                <Tooltip formatter={(v, name) => [fmt(v as number), name === 'gasto' ? 'Gasto' : 'Meta/semana']} contentStyle={{ background: '#241e42', border: '1px solid #413764', borderRadius: 12 }} />
-                <Legend formatter={(v) => v === 'gasto' ? 'Gasto real' : 'Meta/semana'} wrapperStyle={{ fontSize: 11, color: '#948bc7' }} />
-                <ReferenceLine x={`Sem ${todayWeek}`} stroke="#60a5fa" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: 'Hoje', position: 'top', fill: '#60a5fa', fontSize: 10 }} />
-                <Line type="monotone" dataKey="meta" name="meta" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 3" dot={{ fill: '#f59e0b', r: 3 }} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="gasto" name="gasto" stroke="#d946ef" strokeWidth={2.5} dot={{ fill: '#d946ef', r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="flex items-end gap-2" style={{ height: 60 }}>
+              {weeklySpending.map((w, i) => {
+                const maxVal = Math.max(limit / 4, ...weeklySpending.map((x) => x.gasto), 1)
+                const heightPct = Math.max(6, (w.gasto / maxVal) * 100)
+                const isCurrent = i + 1 === todayWeek
+                return (
+                  <div key={w.name} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full rounded-t-lg" style={{
+                      height: `${heightPct}%`,
+                      background: isCurrent ? 'linear-gradient(180deg, #d946ef, #7c3aed)' : '#3d3659',
+                    }} />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex gap-2 mt-1">
+              {weeklySpending.map((w) => (
+                <div key={w.name} className="flex-1 text-center">
+                  <div className="text-[9px] text-slate-400">{w.name}</div>
+                  <div className="text-[10px] font-bold text-slate-200">{fmt(w.gasto)}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Distribuição por método */}
@@ -344,16 +342,6 @@ function StatChip({ icon, label, value, sub, tint, border, iconBg }: { icon: Rea
       <div className="text-[10px] text-slate-300 leading-tight">{label}</div>
       <div className="text-xs font-bold text-slate-100 leading-tight">{value}</div>
       <div className="text-[9px] text-slate-400 leading-tight">{sub}</div>
-    </div>
-  )
-}
-
-function BenchmarkCard({ label, value, pct }: { label: string; value: string; pct: string }) {
-  return (
-    <div className="bg-slate-700/60 rounded-2xl p-2.5">
-      <div className="text-[10px] text-slate-400 mb-1">{label}</div>
-      <div className="text-emerald-400 font-bold text-sm">{value}</div>
-      <div className="text-[10px] text-slate-400">{pct}</div>
     </div>
   )
 }
