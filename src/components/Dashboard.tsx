@@ -1,22 +1,23 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 import { useStore } from '../store'
 import InsightsCard from './InsightsCard'
 import CardSpendGoal from './CardSpendGoal'
-import { fmt, fmtPct, currentMonth, monthLabel, addMonths, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, computeBenefitBalance, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
+import { fmt, fmtPct, currentMonth, monthLabel, addMonths, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
+import { supabase } from '../lib/supabase'
 import {
-  Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, ComposedChart,
+  Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
   LineChart, ReferenceLine, Legend,
 } from 'recharts'
 import {
-  IconFlame, IconReceipt, IconCreditCard,
-  IconTrendingUp, IconTicket, IconCheck, IconEye, IconEyeOff,
+  IconBuildingBank, IconLogout, IconFlame, IconReceipt, IconCreditCard,
+  IconTrendingUp, IconEye, IconEyeOff, IconStar, IconFlag2,
 } from '@tabler/icons-react'
 
 const COLORS = ['#7c3aed', '#d946ef', '#f97316', '#06b6d4']
 
 export default function Dashboard() {
-  const { expenses, budgets, investments, investmentRecords, aportes, annualGoal, incomeReceipts, extraordinaryIncomes, hideSaldo, toggleHideSaldo, benefitCardMonthlyAmount, benefitCardCredits } = useStore()
+  const { expenses, budgets, investments, investmentRecords, aportes, annualGoal, incomeReceipts, extraordinaryIncomes, hideSaldo, toggleHideSaldo } = useStore()
 
   const month = currentMonth()
   const budget = [...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]
@@ -44,15 +45,6 @@ export default function Dashboard() {
     ),
   }))
   const cardSpent = cardFaturas.reduce((s, f) => s + f.amount, 0)
-
-  // Cartão Benefício — saldo contínuo (recarrega e debita, sem fechamento/vencimento mensal)
-  const hasBenefitHistory = (benefitCardCredits ?? []).length > 0
-  const benefitBalance = computeBenefitBalance({ benefitCardCredits: benefitCardCredits ?? [], expenses })
-  const benefitSpentThisMonth = expenses
-    .filter((e) => e.method === 'cartao_beneficio' && e.date.slice(0, 7) === month)
-    .reduce((s, e) => s + e.amount, 0)
-  // Medidor: saldo atual como fração de uma recarga mensal (não é "% usado", é "quanto sobrou")
-  const benefitPct = benefitCardMonthlyAmount > 0 ? Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100)) : 0
 
   // Meta de gastos: mesmo valor das faturas exibidas (líquido de pagamentos)
   const cardSpentOpen = cardSpent
@@ -84,45 +76,10 @@ export default function Dashboard() {
     ? last6Aportes.reduce((s, a) => s + a.amount, 0) / last6Aportes.length
     : 0
   const projectedValue = totalInvested + (avgMonthlyAporte + avgMonthlyReturn) * months
-  const projectedPct = target > 0 ? Math.min((projectedValue / target) * 100, 100) : 0
 
-  // Jornada mensal da carteira (histórico real + projeção futura + benchmarks CDI/Poupança)
-  const allMonths = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(annualGoal.year, 0 + i, 1)
-    return d.toISOString().slice(0, 7)
-  })
-  const recordsByMonth = new Map<string, number>()
-  allMonths.forEach((m) => {
-    const recs = investmentRecords.filter((r) => r.month === m)
-    if (recs.length > 0) {
-      recordsByMonth.set(m, recs.reduce((s, r) => s + r.currentValue, 0))
-    }
-  })
-
-  // Base para CDI/Poupança: valor inicial da carteira em jan/2026
-  const baseValue = investments.reduce((s, i) => s + i.initialValue, 0) || totalInvested
-  const currentMonthIdx = allMonths.indexOf(month)
-
-  const journeyData = allMonths.map((m, idx) => {
-    const isFuture = m > month
-    const isCurrent = m === month
-    const recorded = recordsByMonth.get(m)
-    const valor = isCurrent ? totalInvested : (!isFuture && recorded) ? recorded : (isCurrent ? totalInvested : null)
-
-    // Benchmarks compostos desde janeiro
-    const cdi = baseValue * Math.pow(1 + CDI_MONTHLY, idx + 1)
-    const poupanca = baseValue * Math.pow(1 + POUPANCA_MONTHLY, idx + 1)
-
-    return {
-      name: monthLabel(m).slice(0, 3),
-      valor: isFuture ? null : valor,
-      projecao: isFuture
-        ? totalInvested + (avgMonthlyAporte + avgMonthlyReturn) * (idx - currentMonthIdx)
-        : (isCurrent ? totalInvested : null),
-      cdi: idx <= currentMonthIdx ? cdi : null,
-      poupanca: idx <= currentMonthIdx ? poupanca : null,
-    }
-  })
+  // Passos da jornada até a meta (visual simplificado tipo "fases")
+  const journeySteps = [25, 50, 75, 100].map((pct) => ({ pct, reached: goalPct >= pct }))
+  const currentStepIdx = journeySteps.filter((s) => s.reached).length
 
   // Gastos no cartão por semana — acompanha a fatura aberta de cada cartão, não o mês calendário:
   // mostra os gastos feitos até agora que caem na fatura que vai vencer em breve.
@@ -162,7 +119,19 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       {/* Cabeçalho colorido com onda */}
-      <div className="relative -mx-4 -mt-2 px-4 pt-5 overflow-hidden" style={{ background: 'linear-gradient(160deg, #7c3aed, #d946ef 55%, #f97316)' }}>
+      <div className="relative -mx-4 -mt-2 px-4 pt-4 overflow-hidden" style={{ background: 'linear-gradient(160deg, #7c3aed, #d946ef 55%, #f97316)' }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconBuildingBank size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">NeveInvest</span>
+          </div>
+          <button onClick={() => supabase.auth.signOut()} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white/90" title="Sair">
+            <IconLogout size={15} />
+          </button>
+        </div>
+
         <div className="relative flex items-center justify-center gap-2 mb-1">
           <span className="text-xs font-bold text-white/85">Saldo em conta</span>
           <button onClick={toggleHideSaldo} className="text-white/70 hover:text-white transition-colors" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
@@ -240,38 +209,41 @@ export default function Dashboard() {
           {/* ── INSIGHTS DO DIA ── */}
           <InsightsCard />
 
-          {/* Jornada anual — carteira mês a mês */}
+          {/* Jornada até a meta — caminho de fases */}
           <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
-            <h2 className="font-bold text-[13px] text-slate-100 mb-3">Jornada {annualGoal.year} — carteira mês a mês</h2>
-            <div className="flex flex-wrap gap-3 mb-3 text-[10px] text-slate-400">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />Carteira real</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #60a5fa', background: 'none' }} />Projeção</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-amber-400 rounded" />CDI</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-slate-400 rounded" />Poupança</span>
+            <h2 className="font-bold text-[13px] text-slate-100 mb-3">Sua jornada até a meta</h2>
+            <div className="relative" style={{ height: 46 }}>
+              <svg width="100%" height={46} viewBox="0 0 280 46" preserveAspectRatio="none" className="absolute top-2">
+                <path d="M10,10 Q70,40 140,20 T270,8" fill="none" stroke="#3d3659" strokeWidth={3} strokeLinecap="round" strokeDasharray="1 10" />
+              </svg>
+              {journeySteps.map((s, i) => {
+                const left = i === 0 ? '0%' : i === 1 ? '32%' : i === 2 ? '62%' : undefined
+                const isCurrent = i === currentStepIdx
+                const isLast = i === journeySteps.length - 1
+                const style: CSSProperties = isLast
+                  ? { right: 0, top: 0 }
+                  : { left, top: i === 1 ? 26 : i === 2 ? 10 : 4 }
+                return (
+                  <div
+                    key={s.pct}
+                    className="absolute rounded-full flex items-center justify-center"
+                    style={{
+                      ...style,
+                      width: isCurrent || isLast ? 22 : 18,
+                      height: isCurrent || isLast ? 22 : 18,
+                      border: '3px solid #18132e',
+                      background: s.reached ? '#5dcaa5' : isCurrent ? 'linear-gradient(135deg, #7c3aed, #d946ef)' : '#3d3659',
+                    }}
+                  >
+                    {isCurrent && !isLast && <IconStar size={10} color="#fff" />}
+                    {isLast && <IconFlag2 size={10} color={s.reached ? '#fff' : '#948bc7'} />}
+                  </div>
+                )
+              })}
             </div>
-            <ResponsiveContainer width="100%" height={190}>
-              <ComposedChart data={journeyData}>
-                <defs>
-                  <linearGradient id="gradVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" tick={{ fill: '#948bc7', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#948bc7', fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  formatter={(v, name) => {
-                    const labels: Record<string, string> = { valor: 'Carteira', projecao: 'Projeção', cdi: 'CDI', poupanca: 'Poupança' }
-                    return [fmt(v as number), labels[name as string] ?? name]
-                  }}
-                  contentStyle={{ background: '#241e42', border: '1px solid #413764', borderRadius: 12 }}
-                />
-                <Area type="monotone" dataKey="valor" stroke="#10b981" fill="url(#gradVal)" strokeWidth={2.5} name="valor" connectNulls dot={false} />
-                <Line type="monotone" dataKey="projecao" stroke="#3b82f6" strokeDasharray="5 3" strokeWidth={1.5} name="projecao" connectNulls dot={false} />
-                <Line type="monotone" dataKey="cdi" stroke="#f59e0b" strokeWidth={1.5} name="cdi" connectNulls dot={false} strokeDasharray="3 2" />
-                <Line type="monotone" dataKey="poupanca" stroke="#94a3b8" strokeWidth={1.5} name="poupanca" connectNulls dot={false} strokeDasharray="2 3" />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="text-[10px] text-slate-400 mt-2">
+              {goalPct.toFixed(0)}% da meta — faltam {Math.max(0, 4 - currentStepIdx)} fases até {fmt(target)}
+            </div>
           </div>
 
           {/* Benchmarks */}
@@ -300,39 +272,6 @@ export default function Dashboard() {
             weeklySpent={cardWeeklySpent}
             monthLabelText={monthLabel(cardMonth)}
           />
-
-          {/* Cartão Benefício — saldo contínuo, sem fechamento/vencimento */}
-          <div className="rounded-3xl p-4" style={{ background: 'rgba(240,153,123,0.08)', border: '1px solid rgba(240,153,123,0.2)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-[13px] text-slate-100 flex items-center gap-2">
-                <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(240,153,123,0.2)' }}>
-                  <IconTicket size={14} color="#f0997b" />
-                </span>
-                Cartão benefício
-              </h2>
-              <span className="text-[10px] text-slate-400">recarga de {fmt(benefitCardMonthlyAmount)}/mês</span>
-            </div>
-            {hasBenefitHistory ? (
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1">
-                  <span>Gasto em {monthLabel(month)}: <span className="text-teal-300 font-semibold">{fmt(benefitSpentThisMonth)}</span></span>
-                  <span>Saldo: <span className={`font-semibold ${benefitBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(benefitBalance)}</span></span>
-                </div>
-                <div className="h-2.5 bg-slate-700 rounded-full overflow-hidden mb-1">
-                  <div
-                    className={`h-full rounded-full transition-all ${benefitPct <= 15 ? 'bg-red-500' : benefitPct <= 40 ? 'bg-amber-500' : 'bg-teal-500'}`}
-                    style={{ width: `${benefitPct}%` }}
-                  />
-                </div>
-                <div className="text-[10px] text-slate-400 text-right">{benefitPct.toFixed(0)}% de uma recarga em saldo</div>
-              </div>
-            ) : (
-              <div className="text-center py-2">
-                <div className="text-slate-400 text-sm">Nenhuma recarga confirmada ainda</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Confirme na aba Gastos</div>
-              </div>
-            )}
-          </div>
 
           {/* Gastos por semana */}
           <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
@@ -379,14 +318,19 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Fecho da página */}
-          <div className="flex items-center justify-center gap-2 pb-1 pt-1">
-            <span className="w-6 h-6 rounded-full brand-gradient-bg flex items-center justify-center">
-              <IconCheck size={13} color="#fff" />
-            </span>
-            <span className="text-[11px] font-bold text-slate-300">Tudo em dia por aqui</span>
-          </div>
+        </div>
 
+        {/* Fecho da página — colina decorativa */}
+        <div className="relative -mx-4 mt-2">
+          <svg viewBox="0 0 320 60" className="w-full block" style={{ height: 60 }} preserveAspectRatio="none">
+            <path d="M0,60 L0,30 C 70,5 110,45 180,25 C 240,8 280,35 320,20 L320,60 Z" fill="#241e42" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-end pb-2.5">
+            <span className="w-8 h-8 rounded-full brand-gradient-bg flex items-center justify-center mb-1" style={{ boxShadow: '0 4px 14px rgba(217,70,239,0.4)' }}>
+              <IconFlag2 size={16} color="#fff" />
+            </span>
+            <span className="text-[10px] font-bold text-slate-200">Tudo em dia por aqui</span>
+          </div>
         </div>
       </div>
     </div>
