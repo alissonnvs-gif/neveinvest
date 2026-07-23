@@ -574,36 +574,45 @@ export default function CustosFixos() {
                   const payment = isPaid(cost.id, selectedMonth)
                   const paidExpense = payment ? expenses.find((e) => e.id === payment.expenseId) : null
                   const projected = projectedAmount(cost)
+                  // Custo no cartão é cobrança automática — mostra sempre como pago, em qualquer
+                  // mês (inclusive futuro), já que não depende de ação nenhuma sua. O registro real
+                  // (payment/paidExpense) só existe de fato quando o mês vira o mês corrente (efeito
+                  // acima), mas visualmente não faz sentido mostrar "pendente" num mês que o cartão
+                  // vai cobrar sozinho de qualquer forma.
+                  const isCardCost = CARD_METHODS.includes(cost.defaultMethod as any)
+                  const showAsPaid = isCardCost || !!payment
 
                   return (
                     <div
                       key={cost.id}
                       className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors
-                        ${payment ? 'bg-emerald-900/30 border border-emerald-800/50' : 'bg-slate-700'}`}
+                        ${showAsPaid ? 'bg-emerald-900/30 border border-emerald-800/50' : 'bg-slate-700'}`}
                     >
                       <button
-                        onClick={() => payment ? handleUnpay(cost.id) : openPayModal(cost)}
+                        onClick={() => payment ? handleUnpay(cost.id) : (isCardCost ? undefined : openPayModal(cost))}
+                        disabled={isCardCost && !payment}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors
-                          ${payment ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-500 hover:border-emerald-400'}`}
+                          ${showAsPaid ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-500 hover:border-emerald-400'}
+                          ${isCardCost && !payment ? 'cursor-default' : ''}`}
                       >
-                        {payment && <span className="text-xs">✓</span>}
+                        {showAsPaid && <span className="text-xs">✓</span>}
                       </button>
 
                       <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-medium ${payment ? 'text-slate-400 line-through' : 'text-slate-200'}`}>
+                        <div className={`text-sm font-medium ${showAsPaid ? 'text-slate-400 line-through' : 'text-slate-200'}`}>
                           {cost.description}
                         </div>
                         <div className="text-xs text-slate-500">
                           {cost.category} · {METHODS.find((m) => m.value === cost.defaultMethod)?.icon}
-                          {paidExpense && ` · pago ${fmt(paidExpense.amount)}`}
+                          {paidExpense ? ` · pago ${fmt(paidExpense.amount)}` : isCardCost ? ' · automático' : ''}
                         </div>
                       </div>
 
                       <div className="text-right flex-shrink-0">
-                        <div className={`text-sm font-semibold ${payment ? 'text-emerald-400' : 'text-slate-200'}`}>
+                        <div className={`text-sm font-semibold ${showAsPaid ? 'text-emerald-400' : 'text-slate-200'}`}>
                           {fmt(paidExpense?.amount ?? projected)}
                         </div>
-                        {!payment && cost.defaultAmount !== projected && (
+                        {!payment && !isCardCost && cost.defaultAmount !== projected && (
                           <div className="text-xs text-slate-500">média</div>
                         )}
                       </div>
