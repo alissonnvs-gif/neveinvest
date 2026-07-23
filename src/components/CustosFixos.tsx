@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth, CARDS, CARD_METHODS, cardMethod, faturaMethod, cardIdFromMethod, faturaOpenAmount, getFaturaLancamentos } from '../utils'
 import type { CardId } from '../config/cards'
-import type { PaymentMethod, FixedCost, Expense } from '../types'
+import type { PaymentMethod, FixedCost, Expense, ExtraordinaryIncome } from '../types'
 import CardSpendGoal from './CardSpendGoal'
 import ExpenseEditModal from './ExpenseEditModal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
@@ -22,6 +22,15 @@ const METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
 ]
 
 const CATEGORIES = ['Alimentação', 'Mercado', 'Saúde', 'Transporte', 'Educação', 'Lazer', 'Casa', 'Vestuário', 'Outros']
+
+const EXTRA_TYPES: { value: ExtraordinaryIncome['type']; label: string; icon: string }[] = [
+  { value: 'fgts', label: 'FGTS Aniversário', icon: '🏦' },
+  { value: 'bonus', label: 'Bônus', icon: '🎯' },
+  { value: '13salario', label: '13º Salário', icon: '📅' },
+  { value: 'ferias', label: 'Férias', icon: '🌴' },
+  { value: 'judicial', label: 'Processo Judicial', icon: '⚖️' },
+  { value: 'outro', label: 'Outro', icon: '💰' },
+]
 
 
 function getEndMonth(cost: FixedCost): string | null {
@@ -43,11 +52,53 @@ export default function CustosFixos() {
     addFixedCost, updateFixedCost, removeFixedCost,
     addFixedCostPayment, removeFixedCostPayment,
     addExpense, removeExpense, updateExpense,
+    incomes, addIncome, removeIncome,
+    extraordinaryIncomes, addExtraordinaryIncome, removeExtraordinaryIncome,
   } = useStore()
 
   const [payingFatura, setPayingFatura] = useState<{ card: CardId; month: string; amount: number } | null>(null)
   const [faturaPayForm, setFaturaPayForm] = useState({ date: new Date().toISOString().slice(0, 10) })
   const [expandedCard, setExpandedCard] = useState<CardId | null>(null)
+
+  const [incomeForm, setIncomeForm] = useState({ description: '', amount: '', type: 'fixo' as 'fixo' | 'variavel' | 'extraordinario' })
+  const [showExtraForm, setShowExtraForm] = useState(false)
+  const [extraForm, setExtraForm] = useState({
+    description: '',
+    amount: '',
+    expectedDate: '',
+    probability: '80',
+    type: 'fgts' as ExtraordinaryIncome['type'],
+  })
+
+  function handleAddIncome(ev: React.FormEvent) {
+    ev.preventDefault()
+    if (!incomeForm.description || !incomeForm.amount) {
+      showErrorToast('Preencha descrição e valor da renda.')
+      return
+    }
+    addIncome({ startMonth: currentMonth(), description: incomeForm.description, amount: parseFloat(incomeForm.amount), type: incomeForm.type })
+    showSuccessToast(`Renda "${incomeForm.description}" cadastrada.`)
+    setIncomeForm((f) => ({ ...f, description: '', amount: '' }))
+  }
+
+  function handleAddExtra(ev: React.FormEvent) {
+    ev.preventDefault()
+    if (!extraForm.description || !extraForm.amount || !extraForm.expectedDate) {
+      showErrorToast('Preencha descrição, valor e mês previsto.')
+      return
+    }
+    addExtraordinaryIncome({
+      description: extraForm.description,
+      amount: parseFloat(extraForm.amount),
+      expectedDate: extraForm.expectedDate,
+      probability: parseFloat(extraForm.probability),
+      received: false,
+      type: extraForm.type,
+    })
+    showSuccessToast(`Receita extraordinária "${extraForm.description}" cadastrada.`)
+    setExtraForm({ description: '', amount: '', expectedDate: '', probability: '80', type: 'fgts' })
+    setShowExtraForm(false)
+  }
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
 
   // Fatura aberta / lançamentos de um cartão em determinado mês — lógica compartilhada em utils.ts
@@ -610,6 +661,164 @@ export default function CustosFixos() {
               </div>
             </div>
           )}
+
+          {/* Rendas cadastradas (templates) */}
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(93,202,165,0.08)', border: '1px solid rgba(93,202,165,0.2)' }}>
+            <h2 className="font-bold text-[13px] text-slate-100 mb-1">Rendas cadastradas</h2>
+            <p className="text-xs text-slate-400 mb-2">
+              Fixo projeta e pede confirmação todo mês. Variável/Extraordinário ficam pendentes em
+              qualquer mês até você confirmar uma vez — depois somem da lista.
+            </p>
+
+            <div className="space-y-2 mb-4">
+              {incomes.map((i) => (
+                <div key={i.id} className="flex justify-between items-center bg-slate-800 rounded-2xl px-3 py-2">
+                  <div>
+                    <div className="text-sm text-slate-200">{i.description}</div>
+                    <div className={`text-xs capitalize ${i.type === 'fixo' ? 'text-emerald-400' : i.type === 'variavel' ? 'text-blue-400' : 'text-purple-400'}`}>
+                      {i.type}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 font-medium">{fmt(i.amount)}</span>
+                    <button onClick={() => { removeIncome(i.id); showSuccessToast(`Renda "${i.description}" removida.`) }} className="text-slate-500 hover:text-red-400"><IconX size={13} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAddIncome} className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={incomeForm.description}
+                  onChange={(e) => setIncomeForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Descrição (ex: Bônus)"
+                  className="bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 border border-slate-600"
+                />
+                <input
+                  type="number"
+                  value={incomeForm.amount}
+                  onChange={(e) => setIncomeForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="Valor (R$)"
+                  className="bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 border border-slate-600"
+                />
+              </div>
+              <div className="flex gap-2">
+                {(['fixo', 'variavel', 'extraordinario'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setIncomeForm((f) => ({ ...f, type: t }))}
+                    className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
+                      ${incomeForm.type === t ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  >
+                    {t === 'fixo' ? 'Fixo' : t === 'variavel' ? 'Variável' : 'Extraordinário'}
+                  </button>
+                ))}
+              </div>
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 py-2 rounded-full text-sm font-medium">
+                + Adicionar renda
+              </button>
+            </form>
+          </div>
+
+          {/* Receitas extraordinárias */}
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="font-bold text-[13px] text-slate-100">Receitas extraordinárias</h2>
+              <button
+                onClick={() => setShowExtraForm(!showExtraForm)}
+                className="text-xs bg-purple-700 hover:bg-purple-600 px-3 py-1.5 rounded-full font-medium"
+              >
+                + Adicionar
+              </button>
+            </div>
+
+            {showExtraForm && (
+              <form onSubmit={handleAddExtra} className="bg-slate-800 rounded-2xl p-3 mb-3 space-y-2">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Tipo</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {EXTRA_TYPES.map((t) => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setExtraForm((f) => ({ ...f, type: t.value, description: t.label }))}
+                        className={`py-1.5 rounded text-xs font-medium transition-colors
+                          ${extraForm.type === t.value ? 'bg-purple-600 text-white' : 'bg-slate-600 text-slate-400 hover:bg-slate-500'}`}
+                      >
+                        {t.icon} {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Descrição</label>
+                  <input
+                    value={extraForm.description}
+                    onChange={(e) => setExtraForm((f) => ({ ...f, description: e.target.value }))}
+                    className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Valor esperado (R$)</label>
+                    <input
+                      type="number"
+                      value={extraForm.amount}
+                      onChange={(e) => setExtraForm((f) => ({ ...f, amount: e.target.value }))}
+                      className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Mês previsto</label>
+                    <input
+                      type="month"
+                      value={extraForm.expectedDate}
+                      onChange={(e) => setExtraForm((f) => ({ ...f, expectedDate: e.target.value }))}
+                      className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Probabilidade: {extraForm.probability}%</label>
+                  <input
+                    type="range"
+                    min={0} max={100} step={5}
+                    value={extraForm.probability}
+                    onChange={(e) => setExtraForm((f) => ({ ...f, probability: e.target.value }))}
+                    className="w-full accent-purple-500"
+                  />
+                </div>
+                <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 py-2 rounded-full text-sm font-medium">
+                  Salvar
+                </button>
+              </form>
+            )}
+
+            <div className="space-y-2">
+              {(extraordinaryIncomes ?? []).length === 0 && (
+                <p className="text-slate-500 text-sm text-center py-3">Nenhuma receita cadastrada</p>
+              )}
+              {(extraordinaryIncomes ?? []).map((e) => (
+                <div key={e.id} className={`flex justify-between items-center rounded-2xl px-3 py-2 ${e.received ? 'bg-emerald-900/30' : 'bg-slate-800'}`}>
+                  <div>
+                    <div className="text-sm text-slate-200">{e.description}</div>
+                    <div className="text-xs text-slate-400">
+                      {e.received ? `Recebido em ${e.receivedDate}` : `${e.expectedDate} · ${e.probability}%`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className={`font-medium ${e.received ? 'text-emerald-400' : 'text-purple-400'}`}>{fmt(e.amount)}</div>
+                      {!e.received && <div className="text-xs text-slate-400">{fmt(e.amount * e.probability / 100)}</div>}
+                    </div>
+                    <button onClick={() => { removeExtraordinaryIncome(e.id); showSuccessToast(`"${e.description}" removida.`) }} className="text-slate-500 hover:text-red-400"><IconX size={13} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
