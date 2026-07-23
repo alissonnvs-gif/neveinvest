@@ -373,8 +373,8 @@ export default function Gastos() {
           </svg>
         </div>
 
-        <div className="h-14" />
-        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block" style={{ height: 74 }} preserveAspectRatio="none">
+        <div className="h-24" />
+        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block pointer-events-none" style={{ height: 74 }} preserveAspectRatio="none">
           <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
         </svg>
       </div>
