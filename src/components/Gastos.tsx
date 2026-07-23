@@ -57,9 +57,8 @@ const emptyForm = {
 
 export default function Gastos() {
   const {
-    expenses, budgets, incomes, incomeReceipts, extraordinaryIncomes, aportes,
+    expenses, budgets, incomeReceipts, extraordinaryIncomes, aportes,
     addExpense, removeExpense, updateExpense, upsertBudget,
-    addIncomeReceipt, removeIncomeReceipt,
     hideSaldo, toggleHideSaldo,
     benefitCardMonthlyAmount, benefitCardCredits, addBenefitCardCredit, removeBenefitCardCredit,
   } = useStore()
@@ -85,28 +84,9 @@ export default function Gastos() {
   const [editLimit, setEditLimit] = useState(false)
   const [newLimit, setNewLimit] = useState(String(limit))
   const [confirmPay, setConfirmPay] = useState<CardId | null>(null)
-  const [receiveDate, setReceiveDate] = useState(new Date().toISOString().slice(0, 10))
-  const [receivingId, setReceivingId] = useState<string | null>(null)
-  const [receivingAmount, setReceivingAmount] = useState('')
   const [detailCard, setDetailCard] = useState<CardId | null>(null)
 
   const saldo = computeSaldo({ incomeReceipts: incomeReceipts ?? [], extraordinaryIncomes: extraordinaryIncomes ?? [], expenses, aportes: aportes ?? [] })
-
-  // Rendas projetadas no mês selecionado: 'fixo' aparece todo mês (pendente até confirmar aquele
-  // mês específico); 'variavel'/'extraordinario' aparece em qualquer mês até ser confirmada uma
-  // única vez — depois disso some da lista (é um evento único, não recorrente).
-  const monthIncomes = incomes
-    .filter((i) => i.startMonth <= selectedMonth)
-    .map((income) => {
-      const receipt = (incomeReceipts ?? []).find((r) => r.incomeId === income.id && r.month === selectedMonth)
-      return { income, receipt }
-    })
-    .filter(({ income, receipt }) => {
-      if (income.type === 'fixo') return true
-      if (receipt) return true
-      const receivedElsewhere = (incomeReceipts ?? []).some((r) => r.incomeId === income.id)
-      return !receivedElsewhere
-    })
 
   // Lançamentos por DATA da compra no mês selecionado
   const monthExpenses = expenses
@@ -291,7 +271,7 @@ export default function Gastos() {
   }
 
   const cardPct = limit > 0 ? Math.min(100, (cardSpentOpen / limit) * 100) : 0
-  const ringR = 44
+  const ringR = 62
   const ringC = 2 * Math.PI * ringR
   const ringOffset = ringC - (cardPct / 100) * ringC
 
@@ -311,46 +291,45 @@ export default function Gastos() {
           </button>
         </div>
 
-        <div className="relative flex items-center justify-between gap-3">
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <button onClick={() => setSelectedMonth((m) => addMonths(m, -1))} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
-                <IconChevronLeft size={16} />
+        <div className="relative flex items-center justify-between mb-3">
+          <button onClick={() => setSelectedMonth((m) => addMonths(m, -1))} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
+            <IconChevronLeft size={16} />
+          </button>
+          <div className="text-center">
+            <div className="text-sm font-bold text-white capitalize">{monthLabel(selectedMonth)}</div>
+            {selectedMonth !== defaultMonth && (
+              <button onClick={() => setSelectedMonth(defaultMonth)} className="text-[10px] text-white/80 underline mt-0.5">
+                voltar à fatura atual
               </button>
-              <div className="text-center">
-                <div className="text-sm font-bold text-white capitalize">{monthLabel(selectedMonth)}</div>
-                {selectedMonth !== defaultMonth && (
-                  <button onClick={() => setSelectedMonth(defaultMonth)} className="text-[10px] text-white/80 underline mt-0.5">
-                    voltar à fatura atual
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
-                disabled={selectedMonth >= defaultMonth}
-                className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30"
-              >
-                <IconChevronRight size={16} />
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-white/80">Saldo em conta</span>
-              <button onClick={toggleHideSaldo} className="text-white/70 hover:text-white transition-colors" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
-                {hideSaldo ? <IconEye size={12} /> : <IconEyeOff size={12} />}
-              </button>
-            </div>
-            <div className="text-2xl font-extrabold text-white">{hideSaldo ? '••••••' : fmt(saldo)}</div>
+            )}
           </div>
+          <button
+            onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+            disabled={selectedMonth >= defaultMonth}
+            className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30"
+          >
+            <IconChevronRight size={16} />
+          </button>
+        </div>
 
-          <svg width={100} height={100} viewBox="0 0 100 100" className="flex-shrink-0">
-            <circle cx={50} cy={50} r={ringR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={9} />
-            <circle cx={50} cy={50} r={ringR} fill="none" stroke="#fff" strokeWidth={9} strokeLinecap="round" strokeDasharray={ringC} strokeDashoffset={ringOffset} transform="rotate(-90 50 50)" />
-            <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 17 }}>{cardPct.toFixed(0)}%</text>
-            <text x="50%" y="65%" textAnchor="middle" dominantBaseline="central" className="fill-white/80" style={{ fontSize: 8 }}>meta cartão</text>
+        <div className="relative flex flex-col items-center">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-white/80">Saldo em conta</span>
+            <button onClick={toggleHideSaldo} className="text-white/70 hover:text-white transition-colors" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
+              {hideSaldo ? <IconEye size={12} /> : <IconEyeOff size={12} />}
+            </button>
+          </div>
+          <div className="text-2xl font-extrabold text-white mb-2">{hideSaldo ? '••••••' : fmt(saldo)}</div>
+
+          <svg width={140} height={140} viewBox="0 0 140 140">
+            <circle cx={70} cy={70} r={ringR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={11} />
+            <circle cx={70} cy={70} r={ringR} fill="none" stroke="#fff" strokeWidth={11} strokeLinecap="round" strokeDasharray={ringC} strokeDashoffset={ringOffset} transform="rotate(-90 70 70)" />
+            <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 24 }}>{cardPct.toFixed(0)}%</text>
+            <text x="50%" y="65%" textAnchor="middle" dominantBaseline="central" className="fill-white/80" style={{ fontSize: 11 }}>meta cartão</text>
           </svg>
         </div>
 
-        <div className="h-24" />
+        <div className="h-16" />
         <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block pointer-events-none" style={{ height: 74 }} preserveAspectRatio="none">
           <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
         </svg>
@@ -371,78 +350,6 @@ export default function Gastos() {
               ))}
             </div>
           )}
-
-      {/* Rendas do mês selecionado */}
-      <div className="rounded-3xl p-4" style={{ background: 'rgba(93,202,165,0.08)', border: '1px solid rgba(93,202,165,0.2)' }}>
-        <h2 className="font-bold text-[13px] text-slate-100 mb-3">Rendas — {monthLabel(selectedMonth)}</h2>
-        {monthIncomes.length === 0 ? (
-          <p className="text-slate-500 text-sm text-center py-2">Nenhuma renda cadastrada para {monthLabel(selectedMonth)}.</p>
-        ) : (
-          <div className="space-y-2">
-            {monthIncomes.map(({ income, receipt }) => {
-              const isConfirming = receivingId === income.id
-              return (
-                <div key={income.id} className={`rounded-lg px-3 py-2 ${receipt ? 'bg-emerald-900/20 border border-emerald-800/40' : 'bg-slate-700'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm text-slate-200">{income.description}</div>
-                      <div className="text-xs text-slate-400">
-                        {receipt
-                          ? `Recebido em ${new Date(receipt.receivedDate + 'T12:00:00').toLocaleDateString('pt-BR')}`
-                          : 'Pendente'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`font-medium text-sm ${receipt ? 'text-emerald-400' : 'text-slate-400'}`}>{fmt(receipt ? receipt.amount : income.amount)}</span>
-                      {receipt ? (
-                        <button onClick={() => { removeIncomeReceipt(receipt.id); showSuccessToast('Recebimento desfeito.') }} className="text-xs text-slate-500 hover:text-amber-400" title="Desfazer">↩</button>
-                      ) : (
-                        <button
-                          onClick={() => { setReceivingId(income.id); setReceivingAmount(String(income.amount)) }}
-                          className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-2 py-1 rounded font-medium"
-                        >
-                          Receber
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {isConfirming && (
-                    <div className="mt-2 pt-2 border-t border-slate-600 space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-slate-400 block mb-1">Valor recebido (R$)</label>
-                          <input type="number" step="0.01" value={receivingAmount} onChange={(e) => setReceivingAmount(e.target.value)}
-                            className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 border border-slate-500" autoFocus />
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-400 block mb-1">Data</label>
-                          <input type="date" value={receiveDate} onChange={(e) => setReceiveDate(e.target.value)}
-                            className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 border border-slate-500" />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => {
-                          const amt = parseFloat(receivingAmount.replace(',', '.'))
-                          if (!amt) {
-                            showErrorToast('Valor inválido para confirmar recebimento.')
-                            return
-                          }
-                          addIncomeReceipt({ incomeId: income.id, month: selectedMonth, receivedDate: receiveDate, amount: amt })
-                          showSuccessToast(`Recebimento de ${fmt(amt)} confirmado.`)
-                          setReceivingId(null)
-                        }}
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-1.5 rounded text-xs font-medium">Confirmar</button>
-                        <button onClick={() => setReceivingId(null)} className="flex-1 bg-slate-600 hover:bg-slate-500 py-1.5 rounded text-xs">Cancelar</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
 
       {/* Faturas dos cartões — mês selecionado */}
       <div className="rounded-3xl p-4" style={{ background: 'rgba(237,147,177,0.08)', border: '1px solid rgba(237,147,177,0.2)' }}>
@@ -489,85 +396,6 @@ export default function Gastos() {
             <div className="text-sm font-bold text-blue-400">{fmt(effectiveSpent)}</div>
           </div>
         </div>
-      </div>
-
-      {/* Meta de gastos no cartão */}
-      <CardSpendGoal
-        spent={cardSpentOpen}
-        limit={limit}
-        weeklySpent={cardWeeklySpent}
-        monthLabelText={monthLabel(selectedMonth)}
-        paid={hasCardSpend ? cardFullyPaid : undefined}
-        headerRight={
-          <button onClick={() => setEditLimit(!editLimit)} className="text-xs text-emerald-400 hover:text-emerald-300">
-            {editLimit ? 'Cancelar' : 'Alterar meta'}
-          </button>
-        }
-      >
-        {editLimit && (
-          <div className="flex gap-2 mb-3">
-            <input type="number" value={newLimit} onChange={(e) => setNewLimit(e.target.value)}
-              className="flex-1 bg-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 border border-slate-600" placeholder="Nova meta" />
-            <button onClick={() => {
-              const v = parseFloat(newLimit)
-              if (isNaN(v) || v <= 0) {
-                showErrorToast('Valor de meta inválido.')
-                return
-              }
-              upsertBudget({ month: budget?.month ?? today, limit: v, income: budget?.income ?? 22100 })
-              showSuccessToast(`Meta de gastos atualizada para ${fmt(v)}.`)
-              setEditLimit(false)
-            }}
-              className="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded text-sm font-medium">Salvar</button>
-          </div>
-        )}
-      </CardSpendGoal>
-
-      {/* Cartão Benefício — saldo contínuo, sem fechamento/vencimento */}
-      <div className="rounded-3xl p-4" style={{ background: 'rgba(45,212,191,0.08)', border: '1px solid rgba(45,212,191,0.2)' }}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-[13px] text-slate-100 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(45,212,191,0.2)' }}>
-              <IconTicket size={14} color="#5eead4" />
-            </span>
-            Cartão benefício
-          </h2>
-          <button onClick={handleConfirmBenefitCredit}
-            className="text-xs bg-teal-700 hover:bg-teal-600 text-white px-3 py-1.5 rounded-full font-medium">
-            Confirmar recarga ({fmt(benefitCardMonthlyAmount)})
-          </button>
-        </div>
-
-        {hasBenefitHistory ? (
-          <div>
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>Gasto em {monthLabel(today)}: <span className="text-teal-300 font-semibold">{fmt(benefitSpentThisMonth)}</span></span>
-              <span>Saldo atual: <span className={`font-semibold ${benefitBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(benefitBalance)}</span></span>
-            </div>
-            <div className="h-3 bg-slate-700 rounded-full overflow-hidden mb-1">
-              <div className={`h-full rounded-full transition-all ${benefitPct <= 15 ? 'bg-red-500' : benefitPct <= 40 ? 'bg-amber-500' : 'bg-teal-500'}`}
-                style={{ width: `${benefitPct}%` }} />
-            </div>
-            <div className="text-xs text-slate-500 text-right mb-2">{benefitPct.toFixed(0)}% de uma recarga em saldo</div>
-            {[...(benefitCardCredits ?? [])]
-              .sort((a, b) => b.confirmedDate.localeCompare(a.confirmedDate))
-              .slice(0, 5)
-              .map((c) => (
-                <div key={c.id} className="flex items-center justify-between text-xs text-slate-500 mt-1">
-                  <span>Recarga de {fmt(c.amount)} em {new Date(c.confirmedDate + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-                  <button onClick={() => { removeBenefitCardCredit(c.id); showSuccessToast('Recarga removida.') }} className="text-slate-600 hover:text-red-400 ml-2">✕</button>
-                </div>
-              ))}
-            {(benefitCardCredits ?? []).length > 5 && (
-              <div className="text-xs text-slate-600 mt-1">Veja o histórico completo em Config.</div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-4">
-            <div className="text-slate-500 text-sm mb-1">Nenhuma recarga confirmada ainda</div>
-            <div className="text-xs text-slate-600">Confirme a primeira recarga de <span className="text-teal-300 font-semibold">{fmt(benefitCardMonthlyAmount)}</span> acima</div>
-          </div>
-        )}
       </div>
 
       {/* Formulário de lançamento — não muda com o mês selecionado */}
@@ -684,6 +512,85 @@ export default function Gastos() {
               : 'Lançar gasto'}
           </button>
         </form>
+      </div>
+
+      {/* Meta de gastos no cartão */}
+      <CardSpendGoal
+        spent={cardSpentOpen}
+        limit={limit}
+        weeklySpent={cardWeeklySpent}
+        monthLabelText={monthLabel(selectedMonth)}
+        paid={hasCardSpend ? cardFullyPaid : undefined}
+        headerRight={
+          <button onClick={() => setEditLimit(!editLimit)} className="text-xs text-emerald-400 hover:text-emerald-300">
+            {editLimit ? 'Cancelar' : 'Alterar meta'}
+          </button>
+        }
+      >
+        {editLimit && (
+          <div className="flex gap-2 mb-3">
+            <input type="number" value={newLimit} onChange={(e) => setNewLimit(e.target.value)}
+              className="flex-1 bg-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 border border-slate-600" placeholder="Nova meta" />
+            <button onClick={() => {
+              const v = parseFloat(newLimit)
+              if (isNaN(v) || v <= 0) {
+                showErrorToast('Valor de meta inválido.')
+                return
+              }
+              upsertBudget({ month: budget?.month ?? today, limit: v, income: budget?.income ?? 22100 })
+              showSuccessToast(`Meta de gastos atualizada para ${fmt(v)}.`)
+              setEditLimit(false)
+            }}
+              className="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded text-sm font-medium">Salvar</button>
+          </div>
+        )}
+      </CardSpendGoal>
+
+      {/* Cartão Benefício — saldo contínuo, sem fechamento/vencimento */}
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(45,212,191,0.08)', border: '1px solid rgba(45,212,191,0.2)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-[13px] text-slate-100 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(45,212,191,0.2)' }}>
+              <IconTicket size={14} color="#5eead4" />
+            </span>
+            Cartão benefício
+          </h2>
+          <button onClick={handleConfirmBenefitCredit}
+            className="text-xs bg-teal-700 hover:bg-teal-600 text-white px-3 py-1.5 rounded-full font-medium">
+            Confirmar recarga ({fmt(benefitCardMonthlyAmount)})
+          </button>
+        </div>
+
+        {hasBenefitHistory ? (
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span>Gasto em {monthLabel(today)}: <span className="text-teal-300 font-semibold">{fmt(benefitSpentThisMonth)}</span></span>
+              <span>Saldo atual: <span className={`font-semibold ${benefitBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(benefitBalance)}</span></span>
+            </div>
+            <div className="h-3 bg-slate-700 rounded-full overflow-hidden mb-1">
+              <div className={`h-full rounded-full transition-all ${benefitPct <= 15 ? 'bg-red-500' : benefitPct <= 40 ? 'bg-amber-500' : 'bg-teal-500'}`}
+                style={{ width: `${benefitPct}%` }} />
+            </div>
+            <div className="text-xs text-slate-500 text-right mb-2">{benefitPct.toFixed(0)}% de uma recarga em saldo</div>
+            {[...(benefitCardCredits ?? [])]
+              .sort((a, b) => b.confirmedDate.localeCompare(a.confirmedDate))
+              .slice(0, 5)
+              .map((c) => (
+                <div key={c.id} className="flex items-center justify-between text-xs text-slate-500 mt-1">
+                  <span>Recarga de {fmt(c.amount)} em {new Date(c.confirmedDate + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                  <button onClick={() => { removeBenefitCardCredit(c.id); showSuccessToast('Recarga removida.') }} className="text-slate-600 hover:text-red-400 ml-2">✕</button>
+                </div>
+              ))}
+            {(benefitCardCredits ?? []).length > 5 && (
+              <div className="text-xs text-slate-600 mt-1">Veja o histórico completo em Config.</div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <div className="text-slate-500 text-sm mb-1">Nenhuma recarga confirmada ainda</div>
+            <div className="text-xs text-slate-600">Confirme a primeira recarga de <span className="text-teal-300 font-semibold">{fmt(benefitCardMonthlyAmount)}</span> acima</div>
+          </div>
+        )}
       </div>
 
       {/* Gráfico semanal */}

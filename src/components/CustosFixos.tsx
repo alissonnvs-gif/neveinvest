@@ -52,13 +52,17 @@ export default function CustosFixos() {
     addFixedCost, updateFixedCost, removeFixedCost,
     addFixedCostPayment, removeFixedCostPayment,
     addExpense, removeExpense, updateExpense,
-    incomes, addIncome, removeIncome,
+    incomes, addIncome, removeIncome, incomeReceipts, addIncomeReceipt, removeIncomeReceipt,
     extraordinaryIncomes, addExtraordinaryIncome, removeExtraordinaryIncome,
   } = useStore()
 
   const [payingFatura, setPayingFatura] = useState<{ card: CardId; month: string; amount: number } | null>(null)
   const [faturaPayForm, setFaturaPayForm] = useState({ date: new Date().toISOString().slice(0, 10) })
   const [expandedCard, setExpandedCard] = useState<CardId | null>(null)
+
+  const [receiveDate, setReceiveDate] = useState(new Date().toISOString().slice(0, 10))
+  const [receivingId, setReceivingId] = useState<string | null>(null)
+  const [receivingAmount, setReceivingAmount] = useState('')
 
   const [incomeForm, setIncomeForm] = useState({ description: '', amount: '', type: 'fixo' as 'fixo' | 'variavel' | 'extraordinario' })
   const [showExtraForm, setShowExtraForm] = useState(false)
@@ -123,6 +127,23 @@ export default function CustosFixos() {
   }
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonth())
+
+  // Rendas projetadas no mês selecionado: 'fixo' aparece todo mês (pendente até confirmar aquele
+  // mês específico); 'variavel'/'extraordinario' aparece em qualquer mês até ser confirmada uma
+  // única vez — depois disso some da lista (é um evento único, não recorrente).
+  const monthIncomes = incomes
+    .filter((i) => i.startMonth <= selectedMonth)
+    .map((income) => {
+      const receipt = (incomeReceipts ?? []).find((r) => r.incomeId === income.id && r.month === selectedMonth)
+      return { income, receipt }
+    })
+    .filter(({ income, receipt }) => {
+      if (income.type === 'fixo') return true
+      if (receipt) return true
+      const receivedElsewhere = (incomeReceipts ?? []).some((r) => r.incomeId === income.id)
+      return !receivedElsewhere
+    })
+
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [payingCost, setPayingCost] = useState<FixedCost | null>(null)
@@ -330,6 +351,78 @@ export default function CustosFixos() {
               <span className="font-bold text-[13px] text-slate-100 capitalize">{monthLabel(selectedMonth)}</span>
               <button onClick={() => setSelectedMonth(nextMonth)} className="text-slate-400 hover:text-slate-200 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center"><IconChevronRight size={15} /></button>
             </div>
+          </div>
+
+          {/* Rendas do mês selecionado */}
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(93,202,165,0.08)', border: '1px solid rgba(93,202,165,0.2)' }}>
+            <h2 className="font-bold text-[13px] text-slate-100 mb-3">Rendas — {monthLabel(selectedMonth)}</h2>
+            {monthIncomes.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-2">Nenhuma renda cadastrada para {monthLabel(selectedMonth)}.</p>
+            ) : (
+              <div className="space-y-2">
+                {monthIncomes.map(({ income, receipt }) => {
+                  const isConfirming = receivingId === income.id
+                  return (
+                    <div key={income.id} className={`rounded-lg px-3 py-2 ${receipt ? 'bg-emerald-900/20 border border-emerald-800/40' : 'bg-slate-700'}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm text-slate-200">{income.description}</div>
+                          <div className="text-xs text-slate-400">
+                            {receipt
+                              ? `Recebido em ${new Date(receipt.receivedDate + 'T12:00:00').toLocaleDateString('pt-BR')}`
+                              : 'Pendente'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`font-medium text-sm ${receipt ? 'text-emerald-400' : 'text-slate-400'}`}>{fmt(receipt ? receipt.amount : income.amount)}</span>
+                          {receipt ? (
+                            <button onClick={() => { removeIncomeReceipt(receipt.id); showSuccessToast('Recebimento desfeito.') }} className="text-xs text-slate-500 hover:text-amber-400" title="Desfazer">↩</button>
+                          ) : (
+                            <button
+                              onClick={() => { setReceivingId(income.id); setReceivingAmount(String(income.amount)) }}
+                              className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-2 py-1 rounded font-medium"
+                            >
+                              Receber
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isConfirming && (
+                        <div className="mt-2 pt-2 border-t border-slate-600 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-slate-400 block mb-1">Valor recebido (R$)</label>
+                              <input type="number" step="0.01" value={receivingAmount} onChange={(e) => setReceivingAmount(e.target.value)}
+                                className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 border border-slate-500" autoFocus />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-400 block mb-1">Data</label>
+                              <input type="date" value={receiveDate} onChange={(e) => setReceiveDate(e.target.value)}
+                                className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 border border-slate-500" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => {
+                              const amt = parseFloat(receivingAmount.replace(',', '.'))
+                              if (!amt) {
+                                showErrorToast('Valor inválido para confirmar recebimento.')
+                                return
+                              }
+                              addIncomeReceipt({ incomeId: income.id, month: selectedMonth, receivedDate: receiveDate, amount: amt })
+                              showSuccessToast(`Recebimento de ${fmt(amt)} confirmado.`)
+                              setReceivingId(null)
+                            }}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-1.5 rounded text-xs font-medium">Confirmar</button>
+                            <button onClick={() => setReceivingId(null)} className="flex-1 bg-slate-600 hover:bg-slate-500 py-1.5 rounded text-xs">Cancelar</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Meta de gastos no cartão (slim) */}
