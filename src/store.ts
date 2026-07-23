@@ -131,8 +131,9 @@ interface Store extends AppState {
   addBenefitCardCredit: (c: Omit<BenefitCardCredit, 'id'>) => void
   removeBenefitCardCredit: (id: string) => void
   addSavingsJar: (j: Omit<SavingsJar, 'id'>) => void
-  updateSavingsJar: (id: string, partial: Partial<Omit<SavingsJar, 'id'>>) => void
   removeSavingsJar: (id: string) => void
+  depositToSavingsJar: (id: string, amount: number) => void
+  withdrawFromSavingsJar: (id: string, amount: number) => void
 }
 
 export const useStore = create<Store>()(
@@ -293,12 +294,16 @@ export const useStore = create<Store>()(
         savingsJars: [...(s.savingsJars ?? []), { ...j, id: crypto.randomUUID() }],
       })),
 
-      updateSavingsJar: (id, partial) => set((s) => ({
-        savingsJars: (s.savingsJars ?? []).map((j) => j.id === id ? { ...j, ...partial } : j),
-      })),
-
       removeSavingsJar: (id) => set((s) => ({
         savingsJars: (s.savingsJars ?? []).filter((j) => j.id !== id),
+      })),
+
+      depositToSavingsJar: (id, amount) => set((s) => ({
+        savingsJars: (s.savingsJars ?? []).map((j) => j.id === id ? { ...j, savedValue: j.savedValue + amount } : j),
+      })),
+
+      withdrawFromSavingsJar: (id, amount) => set((s) => ({
+        savingsJars: (s.savingsJars ?? []).map((j) => j.id === id ? { ...j, savedValue: Math.max(0, j.savedValue - amount) } : j),
       })),
     }),
     {

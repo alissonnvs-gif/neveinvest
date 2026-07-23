@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import {
   IconBuildingBank, IconLogout, IconFlame, IconReceipt, IconCreditCard,
-  IconTrendingUp, IconEye, IconEyeOff, IconStar, IconFlag2,
+  IconTrendingUp, IconEye, IconEyeOff, IconStar, IconFlag2, IconPigMoney,
 } from '@tabler/icons-react'
 
 const COLORS = ['#7c3aed', '#d946ef', '#f97316', '#06b6d4']
@@ -105,9 +105,6 @@ export default function Dashboard() {
     streakCursor = addMonths(streakCursor, -1)
   }
 
-  const jarRingR = 26
-  const jarRingC = 2 * Math.PI * jarRingR
-
   return (
     <div className="space-y-4">
       {/* Cabeçalho colorido com onda */}
@@ -142,26 +139,14 @@ export default function Dashboard() {
               Crie sua primeira caixinha em Config para guardar dinheiro pra algo (carro, viagem...).
             </div>
           ) : (
-            <div className="flex gap-3 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
-              {(savingsJars ?? []).map((jar) => {
-                const pct = jar.targetValue > 0 ? Math.min(100, Math.max(0, (jar.savedValue / jar.targetValue) * 100)) : 0
-                const offset = jarRingC - (pct / 100) * jarRingC
-                return (
-                  <div key={jar.id} className="flex flex-col items-center flex-shrink-0" style={{ width: 72 }}>
-                    <svg width={64} height={64} viewBox="0 0 64 64">
-                      <circle cx={32} cy={32} r={jarRingR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={6} />
-                      <circle
-                        cx={32} cy={32} r={jarRingR} fill="none" stroke="#fff" strokeWidth={6} strokeLinecap="round"
-                        strokeDasharray={jarRingC} strokeDashoffset={offset} transform="rotate(-90 32 32)"
-                      />
-                      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 13 }}>
-                        {pct.toFixed(0)}%
-                      </text>
-                    </svg>
-                    <span className="text-[10px] text-white/85 font-medium text-center truncate w-full mt-1">{jar.name}</span>
-                  </div>
-                )
-              })}
+            <div className="flex gap-2.5 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
+              {(savingsJars ?? []).map((jar) => (
+                <div key={jar.id} className="flex flex-col items-center flex-shrink-0 bg-white/15 rounded-2xl px-3 py-2.5" style={{ minWidth: 84 }}>
+                  <IconPigMoney size={18} color="#fff" />
+                  <span className="text-sm font-extrabold text-white mt-1 whitespace-nowrap">{fmt(jar.savedValue)}</span>
+                  <span className="text-[10px] text-white/80 font-medium text-center truncate w-full">{jar.name}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

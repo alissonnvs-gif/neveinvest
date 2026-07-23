@@ -118,12 +118,12 @@ export interface FixedCost {
   active: boolean
 }
 
-// Caixinha de dinheiro guardado para um objetivo (carro, viagem etc). `savedValue` é
-// atualizado manualmente pelo usuário em Configurações — não está ligado a saldo/investimentos.
+// Caixinha de dinheiro guardado para algo (carro, viagem etc) — não é uma meta com percentual,
+// só um valor guardado que sobe/desce por depósito e retirada manuais, sem ligação com
+// saldo/investimentos reais.
 export interface SavingsJar {
   id: string
   name: string
-  targetValue: number
   savedValue: number
   createdAt: string // ISO date
 }
