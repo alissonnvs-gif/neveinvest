@@ -430,7 +430,7 @@ export default function CustosFixos() {
             <CardSpendGoal
               slim
               spent={totalFaturaAberta}
-              limit={[...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]?.limit ?? 8000}
+              limit={[...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]?.limit || 8000}
               monthLabelText={monthLabel(selectedMonth)}
             />
           </div>

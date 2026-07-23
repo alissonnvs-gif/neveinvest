@@ -265,7 +265,7 @@ export default function Configuracoes() {
         <div className="flex gap-2">
           <input
             type="number"
-            defaultValue={budget?.limit ?? 8000}
+            defaultValue={budget?.limit || 8000}
             onBlur={(e) => {
               const v = parseFloat(e.target.value)
               if (isNaN(v) || v <= 0) {

@@ -45,7 +45,7 @@ export default function Dashboard() {
     expenses.filter((e) => cardFaturas.some((f) => e.method === cardMethod(f.card.id) && e.month === f.month))
   )
   const saldo = computeSaldo({ incomeReceipts: incomeReceipts ?? [], extraordinaryIncomes: extraordinaryIncomes ?? [], expenses, aportes: aportes ?? [] })
-  const limit = budget?.limit ?? 8000
+  const limit = budget?.limit || 8000
 
   const totalInvested = investments.reduce((s, i) => s + i.currentValue, 0)
   const target = annualGoal.targetValue

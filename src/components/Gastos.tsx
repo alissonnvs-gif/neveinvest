@@ -76,7 +76,7 @@ export default function Gastos() {
   }).filter((o) => o.month)
 
   const budget = [...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]
-  const limit = budget?.limit ?? 8000
+  const limit = budget?.limit || 8000
 
   const [form, setForm] = useState({ ...emptyForm })
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
