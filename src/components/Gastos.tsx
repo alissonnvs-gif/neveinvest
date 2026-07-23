@@ -3,11 +3,12 @@ import { useStore } from '../store'
 import {
   fmt, currentMonth, monthLabel, computeSaldo, computeBenefitBalance,
   CARDS, CARD_METHODS, FATURA_METHODS, cardMethod, faturaMethod, cardIdFromMethod,
-  getFaturaMonth, addMonths, weeklyBuckets, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount,
+  getFaturaMonth, addMonths, weeklyBuckets, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, getFaturaLancamentos,
 } from '../utils'
 import type { CardId } from '../config/cards'
 import type { PaymentMethod, Expense } from '../types'
 import CardSpendGoal from './CardSpendGoal'
+import ExpenseEditModal from './ExpenseEditModal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
 import { supabase } from '../lib/supabase'
 import {
@@ -80,7 +81,6 @@ export default function Gastos() {
 
   const [form, setForm] = useState({ ...emptyForm })
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
-  const [editForm, setEditForm] = useState({ ...emptyForm })
 
   const [editLimit, setEditLimit] = useState(false)
   const [newLimit, setNewLimit] = useState(String(limit))
@@ -113,20 +113,18 @@ export default function Gastos() {
     .filter((e) => e.date.slice(0, 7) === selectedMonth)
     .sort((a, b) => b.date.localeCompare(a.date))
 
-  // Faturas dos cartões para o mês selecionado (mês da fatura = selectedMonth)
+  // Faturas dos cartões para o mês selecionado (mês da fatura = selectedMonth) — usa
+  // utils.faturaOpenAmount como única fonte de verdade (evita divergir de Dashboard/CustosFixos)
   const cardTotals = CARDS.map((c) => {
     const total = expenses.filter((e) => e.method === cardMethod(c.id) && e.month === selectedMonth).reduce((s, e) => s + e.amount, 0)
-    const paidAmount = expenses.filter((e) => e.method === faturaMethod(c.id) && e.month === selectedMonth).reduce((s, e) => s + e.amount, 0)
-    const fatura = Math.max(0, total - paidAmount)
+    const fatura = faturaOpenAmount(expenses, c.id, selectedMonth)
     const isPaid = total > 0 && fatura <= 0
     const paidDate = expenses.filter((e) => e.method === faturaMethod(c.id) && e.month === selectedMonth).sort((a, b) => b.date.localeCompare(a.date))[0]?.date
     return { card: c, total, fatura, isPaid, paidDate }
   })
 
-  function getFaturaLancamentos(card: CardId) {
-    return expenses
-      .filter((e) => e.method === cardMethod(card) && e.month === selectedMonth)
-      .sort((a, b) => b.date.localeCompare(a.date))
+  function getFaturaLancamentosLocal(card: CardId) {
+    return getFaturaLancamentos(expenses, card, selectedMonth)
   }
 
   // "No cartão (mês)" = total bruto lançado na fatura do mês selecionado
@@ -258,38 +256,17 @@ export default function Gastos() {
 
   function openEditModal(e: Expense) {
     setEditingExpense(e)
-    setEditForm({
-      date: e.date,
-      description: e.description,
-      amount: String(Math.abs(e.amount)),
-      method: e.method,
-      category: e.category,
-      installments: String(e.installments ?? 1),
-      isEstorno: !!e.isEstorno,
-    })
   }
 
-  function handleSaveEdit(ev: React.FormEvent) {
-    ev.preventDefault()
-    if (!editingExpense) return
-    const amount = parseFloat(editForm.amount.replace(',', '.'))
-    if (isNaN(amount) || amount <= 0) {
-      showErrorToast('Valor inválido — informe um número maior que zero.')
-      return
-    }
-    const isEstorno = !!editingExpense.isEstorno
-    const isCard = CARD_METHODS.includes(editForm.method as any)
-    const card = cardIdFromMethod(editForm.method)
-    const expMonth = isCard ? getFaturaMonth(editForm.date, card) : editForm.date.slice(0, 7)
-    updateExpense(editingExpense.id, {
-      date: editForm.date,
-      description: editForm.description,
-      amount: isEstorno ? -amount : amount,
-      method: editForm.method,
-      category: isEstorno ? ESTORNO_CATEGORY : editForm.category,
-      month: expMonth,
-    })
+  function handleSaveEdit(id: string, patch: Partial<Omit<Expense, 'id'>>) {
+    updateExpense(id, patch)
     showSuccessToast('Lançamento atualizado.')
+    setEditingExpense(null)
+  }
+
+  function handleDeleteEdit(id: string) {
+    removeExpense(id)
+    showSuccessToast('Lançamento removido.')
     setEditingExpense(null)
   }
 
@@ -830,10 +807,10 @@ export default function Gastos() {
                 {info.isPaid && <span className="text-emerald-400"> · Pago</span>}
               </p>
               <div className="flex-1 overflow-y-auto space-y-1.5">
-                {getFaturaLancamentos(detailCard).length === 0 ? (
+                {getFaturaLancamentosLocal(detailCard).length === 0 ? (
                   <p className="text-slate-500 text-sm text-center py-6">Nenhum lançamento nesta fatura.</p>
                 ) : (
-                  getFaturaLancamentos(detailCard).map((e) => (
+                  getFaturaLancamentosLocal(detailCard).map((e) => (
                     <div key={e.id} className={`flex items-center justify-between rounded-2xl px-3 py-2 ${e.isEstorno ? 'bg-emerald-900/20 border border-emerald-800/40' : 'bg-slate-700'}`}>
                       <div className="min-w-0 pr-2">
                         <div className="text-sm text-slate-200 truncate">{e.description}</div>
@@ -842,7 +819,11 @@ export default function Gastos() {
                           {e.installments && e.installments > 1 && ` · ${e.installmentNumber}/${e.installments}`}
                         </div>
                       </div>
-                      <span className={`font-medium flex-shrink-0 ${e.isEstorno ? 'text-emerald-400' : 'text-amber-400'}`}>{fmt(e.amount)}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`font-medium ${e.isEstorno ? 'text-emerald-400' : 'text-amber-400'}`}>{fmt(e.amount)}</span>
+                        <button onClick={() => openEditModal(e)} className="text-slate-500 hover:text-blue-400" title="Editar"><IconPencil size={13} /></button>
+                        <button onClick={() => { removeExpense(e.id); showSuccessToast('Lançamento removido.') }} className="text-slate-500 hover:text-red-400"><IconX size={13} /></button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -855,61 +836,14 @@ export default function Gastos() {
 
       {/* Modal de edição */}
       {editingExpense && (
-        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-3xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-200">{editingExpense.isEstorno ? 'Editar estorno' : 'Editar lançamento'}</h3>
-              <button onClick={() => setEditingExpense(null)} className="text-slate-500 hover:text-slate-300"><IconX size={18} /></button>
-            </div>
-            <form onSubmit={handleSaveEdit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Data</label>
-                  <input type="date" value={editForm.date} onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))}
-                    className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Valor (R$)</label>
-                  <input type="number" step="0.01" value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: e.target.value }))}
-                    className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600" />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Descrição</label>
-                <input type="text" value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-                  className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Categoria</label>
-                  {editingExpense.isEstorno ? (
-                    <div className="w-full bg-slate-700/50 rounded px-3 py-2 text-sm text-emerald-400 border border-slate-600">↩️ Estorno</div>
-                  ) : (
-                    <select value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
-                      className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600">
-                      {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-                    </select>
-                  )}
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Forma de pagamento</label>
-                  {editingExpense.isEstorno ? (
-                    <div className="w-full bg-slate-700/50 rounded px-3 py-2 text-sm text-slate-300 border border-slate-600">{methodIcon(editForm.method)} {methodLabel(editForm.method)}</div>
-                  ) : (
-                    <select value={editForm.method} onChange={(e) => setEditForm((f) => ({ ...f, method: e.target.value as PaymentMethod }))}
-                      className="w-full bg-slate-700 rounded px-3 py-2 text-sm text-slate-200 border border-slate-600">
-                      {METHODS.map((m) => <option key={m.value} value={m.value}>{m.icon} {m.label}</option>)}
-                    </select>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2.5 rounded-full text-sm font-medium">Salvar</button>
-                <button type="button" onClick={() => setEditingExpense(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-full text-sm">Cancelar</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ExpenseEditModal
+          expense={editingExpense}
+          methods={METHODS}
+          categories={CATEGORIES}
+          onClose={() => setEditingExpense(null)}
+          onSave={handleSaveEdit}
+          onDelete={handleDeleteEdit}
+        />
       )}
     </div>
   )

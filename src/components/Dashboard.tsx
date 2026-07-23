@@ -35,10 +35,7 @@ export default function Dashboard() {
   const cardFaturas = cardOpenFaturas.map(({ card, month }) => ({
     card,
     month,
-    amount: Math.max(0,
-      expenses.filter((e) => e.method === cardMethod(card.id) && e.month === month).reduce((s, e) => s + e.amount, 0)
-      - expenses.filter((e) => e.method === `fatura_${card.id}` && e.month === month).reduce((s, e) => s + e.amount, 0)
-    ),
+    amount: faturaOpenAmount(expenses, card.id, month),
   }))
   const cardSpent = cardFaturas.reduce((s, f) => s + f.amount, 0)
 

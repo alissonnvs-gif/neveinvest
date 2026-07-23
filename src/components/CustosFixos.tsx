@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth, CARDS, cardMethod, faturaMethod } from '../utils'
+import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth, CARDS, CARD_METHODS, cardMethod, faturaMethod, cardIdFromMethod, faturaOpenAmount, getFaturaLancamentos } from '../utils'
 import type { CardId } from '../config/cards'
-import type { PaymentMethod, FixedCost } from '../types'
+import type { PaymentMethod, FixedCost, Expense } from '../types'
 import CardSpendGoal from './CardSpendGoal'
+import ExpenseEditModal from './ExpenseEditModal'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
 import { supabase } from '../lib/supabase'
 import {
   IconBuildingBank, IconLogout, IconClipboardList, IconChevronLeft, IconChevronRight, IconCreditCard,
-  IconCheck, IconX,
+  IconCheck, IconX, IconPencil,
 } from '@tabler/icons-react'
 
 const PAGE_GRADIENT = 'linear-gradient(160deg, #3b82f6, #7c3aed)'
@@ -41,30 +42,18 @@ export default function CustosFixos() {
     fixedCosts, fixedCostPayments, expenses, budgets,
     addFixedCost, updateFixedCost, removeFixedCost,
     addFixedCostPayment, removeFixedCostPayment,
-    addExpense, removeExpense,
+    addExpense, removeExpense, updateExpense,
   } = useStore()
 
   const [payingFatura, setPayingFatura] = useState<{ card: CardId; month: string; amount: number } | null>(null)
   const [faturaPayForm, setFaturaPayForm] = useState({ date: new Date().toISOString().slice(0, 10) })
   const [expandedCard, setExpandedCard] = useState<CardId | null>(null)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
 
-  // Calcula fatura aberta para um cartão em determinado mês
-  function getFaturaAberta(card: CardId, fatMonth: string): number {
-    const method = cardMethod(card)
-    const payMethod = faturaMethod(card)
-    const total = expenses.filter((e) => e.method === method && e.month === fatMonth).reduce((s, e) => s + e.amount, 0)
-    const paid = expenses.filter((e) => e.method === payMethod && e.month === fatMonth).reduce((s, e) => s + e.amount, 0)
-    return Math.max(0, total - paid)
-  }
-
-
-  // Lista os lançamentos individuais que compõem a fatura de um cartão em determinado mês
-  function getFaturaLancamentos(card: CardId, fatMonth: string) {
-    const method = cardMethod(card)
-    return expenses
-      .filter((e) => e.method === method && e.month === fatMonth)
-      .sort((a, b) => b.date.localeCompare(a.date))
-  }
+  // Fatura aberta / lançamentos de um cartão em determinado mês — lógica compartilhada em utils.ts
+  // (evita reimplementação local divergente da mesma conta usada em Dashboard/Gastos)
+  const getFaturaAberta = (card: CardId, fatMonth: string) => faturaOpenAmount(expenses, card, fatMonth)
+  const getFaturaLancamentosLocal = (card: CardId, fatMonth: string) => getFaturaLancamentos(expenses, card, fatMonth)
 
   function handlePagarFatura() {
     if (!payingFatura) return
@@ -186,6 +175,8 @@ export default function CustosFixos() {
       return
     }
     const expId = crypto.randomUUID()
+    const isCard = CARD_METHODS.includes(payForm.method as any)
+    const expMonth = isCard ? getFaturaMonth(payForm.date, cardIdFromMethod(payForm.method)) : selectedMonth
     addExpense({
       id: expId,
       date: payForm.date,
@@ -193,7 +184,7 @@ export default function CustosFixos() {
       amount,
       method: payForm.method,
       category: payingCost.category,
-      month: selectedMonth,
+      month: expMonth,
     } as any)
     addFixedCostPayment({
       fixedCostId: payingCost.id,
@@ -315,7 +306,7 @@ export default function CustosFixos() {
                     const amount = getFaturaAberta(card, faturaMonth)
                     const isPaid = amount === 0 &&
                       expenses.some((e) => e.method === faturaMethod(card) && e.month === faturaMonth)
-                    const lancamentos = getFaturaLancamentos(card, faturaMonth)
+                    const lancamentos = getFaturaLancamentosLocal(card, faturaMonth)
                     const isExpanded = expandedCard === card
                     return (
                       <div key={card} className={`rounded-2xl overflow-hidden border
@@ -365,7 +356,11 @@ export default function CustosFixos() {
                                     {e.installments && e.installments > 1 && ` · ${e.installmentNumber}/${e.installments}`}
                                   </div>
                                 </div>
-                                <div className={`font-medium flex-shrink-0 ${e.isEstorno ? 'text-emerald-400' : 'text-amber-300'}`}>{fmt(e.amount)}</div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <div className={`font-medium ${e.isEstorno ? 'text-emerald-400' : 'text-amber-300'}`}>{fmt(e.amount)}</div>
+                                  <button onClick={() => setEditingExpense(e)} className="text-slate-500 hover:text-blue-400" title="Editar"><IconPencil size={12} /></button>
+                                  <button onClick={() => { removeExpense(e.id); showSuccessToast('Lançamento removido.') }} className="text-slate-500 hover:text-red-400"><IconX size={12} /></button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -789,6 +784,17 @@ export default function CustosFixos() {
             </div>
           </div>
         </div>
+      )}
+
+      {editingExpense && (
+        <ExpenseEditModal
+          expense={editingExpense}
+          methods={METHODS}
+          categories={CATEGORIES}
+          onClose={() => setEditingExpense(null)}
+          onSave={(id, patch) => { updateExpense(id, patch); showSuccessToast('Lançamento atualizado.'); setEditingExpense(null) }}
+          onDelete={(id) => { removeExpense(id); showSuccessToast('Lançamento removido.'); setEditingExpense(null) }}
+        />
       )}
     </div>
   )
