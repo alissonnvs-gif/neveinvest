@@ -14,7 +14,7 @@ interface Props {
 }
 
 const tabs: { id: Tab; label: string; icon: typeof IconHome; color: string }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: IconHome, color: '#fff' },
+  { id: 'dashboard', label: 'Geral', icon: IconHome, color: '#fff' },
   { id: 'gastos', label: 'Gastos', icon: IconCreditCard, color: '#ed93b1' },
   { id: 'custos-fixos', label: 'Fixos', icon: IconClipboardList, color: '#85b7eb' },
   { id: 'investimentos', label: 'Investimentos', icon: IconChartLine, color: '#5dcaa5' },
