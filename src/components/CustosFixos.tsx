@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth, CARDS, CARD_METHODS, cardMethod, faturaMethod, cardIdFromMethod, faturaOpenAmount, getFaturaLancamentos } from '../utils'
 import type { CardId } from '../config/cards'
@@ -59,6 +59,50 @@ export default function CustosFixos() {
   const [payingFatura, setPayingFatura] = useState<{ card: CardId; month: string; amount: number } | null>(null)
   const [faturaPayForm, setFaturaPayForm] = useState({ date: new Date().toISOString().slice(0, 10) })
   const [expandedCard, setExpandedCard] = useState<CardId | null>(null)
+
+  // Custos fixos pagos no cartão são cobrança automática (o cartão debita sozinho todo mês) —
+  // diferente de boleto/pix/dinheiro, que dependem de uma ação real do usuário. Por isso, ao
+  // contrário desses, eles não pedem confirmação manual: assim que o mês vigente chega, o app
+  // já lança a despesa e marca como pago sozinho, sem precisar clicar em "Pagar". Só vale daí
+  // pra frente (não preenche meses passados retroativamente) e só roda uma vez por mês por
+  // custo (verifica se já existe um FixedCostPayment antes de criar outro).
+  //
+  // A despesa (Expense.month) vai pro mês da fatura REAL do cartão (getFaturaMonth, baseado no
+  // dia de fechamento) — isso mantém "Faturas de cartão" sempre exato. Já o registro de
+  // pagamento (FixedCostPayment.month) usa o mês corrente real (currentMonth()), não o mês da
+  // fatura — assim o check de "pago" aparece já marcado no Checklist assim que você abre o app
+  // no mês vigente, em vez de só aparecer marcado lá na frente quando a fatura fechar.
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const thisMonth = currentMonth()
+    fixedCosts.forEach((cost) => {
+      if (!CARD_METHODS.includes(cost.defaultMethod as any)) return
+      if (!isActiveInMonth(cost, thisMonth)) return
+      const card = cardIdFromMethod(cost.defaultMethod)
+      const expMonth = getFaturaMonth(today, card)
+      // Lê o estado ao vivo (não o snapshot do render) pra não duplicar em re-execuções do efeito
+      // (ex: StrictMode em dev, que roda efeitos duas vezes de propósito)
+      const alreadyGenerated = useStore.getState().fixedCostPayments.some((p) => p.fixedCostId === cost.id && p.month === thisMonth)
+      if (alreadyGenerated) return
+      const expId = crypto.randomUUID()
+      addExpense({
+        id: expId,
+        date: today,
+        description: cost.description,
+        amount: cost.defaultAmount,
+        method: cost.defaultMethod,
+        category: cost.category,
+        month: expMonth,
+      } as any)
+      addFixedCostPayment({
+        fixedCostId: cost.id,
+        month: thisMonth,
+        expenseId: expId,
+        paidAt: new Date().toISOString(),
+      })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixedCosts])
 
   const [receiveDate, setReceiveDate] = useState(new Date().toISOString().slice(0, 10))
   const [receivingId, setReceivingId] = useState<string | null>(null)
