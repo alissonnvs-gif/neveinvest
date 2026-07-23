@@ -978,7 +978,16 @@ export default function CustosFixos() {
             <div className="space-y-3">
               {projectionMonths.map((month) => {
                 const active = (fixedCosts ?? []).filter((c) => isActiveInMonth(c, month))
-                const total = active.reduce((s, c) => s + projectedAmount(c), 0)
+                // Custos no cartão são agrupados por cartão (não por nome individual) pra bater
+                // certinho com a fatura e não confundir — mostrar cada assinatura separada aqui
+                // dava a impressão de que era gasto a mais, além do que já aparece na fatura.
+                const nonCardActive = active.filter((c) => !CARD_METHODS.includes(c.defaultMethod as any))
+                const cardActive = active.filter((c) => CARD_METHODS.includes(c.defaultMethod as any))
+                const amountFor = (c: FixedCost) => {
+                  const payment = isPaid(c.id, month)
+                  const paidAmt = payment ? expenses.find((e) => e.id === payment.expenseId)?.amount : null
+                  return paidAmt ?? projectedAmount(c)
+                }
                 const isPast = month < currentMonth()
                 const isCurrent = month === currentMonth()
                 const paidTotal = active.filter((c) => isPaid(c.id, month)).reduce((s, c) => {
@@ -986,8 +995,14 @@ export default function CustosFixos() {
                   return s + (expenses.find((e) => e.id === p.expenseId)?.amount ?? 0)
                 }, 0)
 
-                const fatByCard = CARDS.map((c) => ({ card: c, amount: getFaturaAberta(c.id, month) }))
-                const totalWithFatura = total + fatByCard.reduce((s, f) => s + f.amount, 0)
+                const cardTotals = CARDS.map((card) => ({
+                  card,
+                  amount: cardActive
+                    .filter((c) => cardIdFromMethod(c.defaultMethod) === card.id)
+                    .reduce((s, c) => s + amountFor(c), 0),
+                })).filter((f) => f.amount > 0)
+                const nonCardTotal = nonCardActive.reduce((s, c) => s + amountFor(c), 0)
+                const totalWithFatura = nonCardTotal + cardTotals.reduce((s, f) => s + f.amount, 0)
                 return (
                   <div key={month} className={`rounded-2xl p-3 ${isCurrent ? 'bg-slate-700 ring-1 ring-emerald-500' : 'bg-slate-700/60'}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -1002,17 +1017,16 @@ export default function CustosFixos() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      {active.map((c) => {
+                      {nonCardActive.map((c) => {
                         const payment = isPaid(c.id, month)
-                        const paidAmt = payment ? expenses.find((e) => e.id === payment.expenseId)?.amount : null
                         return (
                           <div key={c.id} className="flex justify-between text-xs text-slate-400">
                             <span className={payment ? 'line-through text-slate-500' : ''}>{c.description}</span>
-                            <span className={payment ? 'text-emerald-500' : ''}>{fmt(paidAmt ?? projectedAmount(c))}</span>
+                            <span className={payment ? 'text-emerald-500' : ''}>{fmt(amountFor(c))}</span>
                           </div>
                         )
                       })}
-                      {fatByCard.filter((f) => f.amount > 0).map((f) => (
+                      {cardTotals.map((f) => (
                         <div key={f.card.id} className="flex justify-between text-xs text-amber-400">
                           <span>Fatura {f.card.label}</span>
                           <span>{fmt(f.amount)}</span>
