@@ -260,7 +260,7 @@ export default function CustosFixos() {
     } as any)
     addFixedCostPayment({
       fixedCostId: payingCost.id,
-      month: selectedMonth,
+      month: expMonth,
       expenseId: expId,
       paidAt: new Date().toISOString(),
     })
