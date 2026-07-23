@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AppState, Expense, MonthlyBudget, Income, IncomeReceipt, Investment, InvestmentRecord, Aporte, AnnualGoal, ExtraordinaryIncome, FixedCost, FixedCostPayment, CardBillPayment, DailyInsights, BenefitCardCredit } from './types'
+import type { AppState, Expense, MonthlyBudget, Income, IncomeReceipt, Investment, InvestmentRecord, Aporte, AnnualGoal, ExtraordinaryIncome, FixedCost, FixedCostPayment, CardBillPayment, DailyInsights, BenefitCardCredit, SavingsJar } from './types'
 import { saveToSupabase } from './lib/supabase'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -93,6 +93,7 @@ const defaultState: AppState = {
   dailyInsights: null,
   benefitCardMonthlyAmount: 0,
   benefitCardCredits: [],
+  savingsJars: [],
 }
 
 interface Store extends AppState {
@@ -129,6 +130,9 @@ interface Store extends AppState {
   setBenefitCardMonthlyAmount: (amount: number) => void
   addBenefitCardCredit: (c: Omit<BenefitCardCredit, 'id'>) => void
   removeBenefitCardCredit: (id: string) => void
+  addSavingsJar: (j: Omit<SavingsJar, 'id'>) => void
+  updateSavingsJar: (id: string, partial: Partial<Omit<SavingsJar, 'id'>>) => void
+  removeSavingsJar: (id: string) => void
 }
 
 export const useStore = create<Store>()(
@@ -283,6 +287,18 @@ export const useStore = create<Store>()(
 
       removeBenefitCardCredit: (id) => set((s) => ({
         benefitCardCredits: (s.benefitCardCredits ?? []).filter((c) => c.id !== id),
+      })),
+
+      addSavingsJar: (j) => set((s) => ({
+        savingsJars: [...(s.savingsJars ?? []), { ...j, id: crypto.randomUUID() }],
+      })),
+
+      updateSavingsJar: (id, partial) => set((s) => ({
+        savingsJars: (s.savingsJars ?? []).map((j) => j.id === id ? { ...j, ...partial } : j),
+      })),
+
+      removeSavingsJar: (id) => set((s) => ({
+        savingsJars: (s.savingsJars ?? []).filter((j) => j.id !== id),
       })),
     }),
     {

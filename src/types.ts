@@ -118,6 +118,16 @@ export interface FixedCost {
   active: boolean
 }
 
+// Caixinha de dinheiro guardado para um objetivo (carro, viagem etc). `savedValue` é
+// atualizado manualmente pelo usuário em Configurações — não está ligado a saldo/investimentos.
+export interface SavingsJar {
+  id: string
+  name: string
+  targetValue: number
+  savedValue: number
+  createdAt: string // ISO date
+}
+
 export interface FixedCostPayment {
   id: string
   fixedCostId: string
@@ -156,4 +166,5 @@ export interface AppState {
   dailyInsights: DailyInsights | null
   benefitCardMonthlyAmount: number
   benefitCardCredits: BenefitCardCredit[]
+  savingsJars: SavingsJar[]
 }

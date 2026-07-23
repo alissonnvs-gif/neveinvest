@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { fmt, currentMonth, computeBenefitBalance, monthLabel } from '../utils'
 import { showSuccessToast, showErrorToast } from '../lib/toast'
 import { supabase } from '../lib/supabase'
-import { IconBuildingBank, IconLogout, IconSettings, IconTicket, IconX } from '@tabler/icons-react'
+import { IconBuildingBank, IconLogout, IconSettings, IconTicket, IconX, IconPigMoney, IconPencil } from '@tabler/icons-react'
 
 const PAGE_GRADIENT = 'linear-gradient(160deg, #584f7c, #3d3659)'
 
@@ -12,6 +12,7 @@ export default function Configuracoes() {
     incomes, budgets, expenses, upsertBudget,
     benefitCardMonthlyAmount, benefitCardCredits,
     setBenefitCardMonthlyAmount, addBenefitCardCredit, removeBenefitCardCredit,
+    savingsJars, addSavingsJar, updateSavingsJar, removeSavingsJar,
   } = useStore()
 
   const benefitBalance = computeBenefitBalance({ benefitCardCredits: benefitCardCredits ?? [], expenses })
@@ -22,6 +23,40 @@ export default function Configuracoes() {
 
   const [benefitAmountEdit, setBenefitAmountEdit] = useState(false)
   const [newBenefitAmount, setNewBenefitAmount] = useState(String(benefitCardMonthlyAmount))
+
+  const [showJarForm, setShowJarForm] = useState(false)
+  const [jarForm, setJarForm] = useState({ name: '', targetValue: '' })
+  const [editingJarId, setEditingJarId] = useState<string | null>(null)
+  const [editJarAmount, setEditJarAmount] = useState('')
+
+  function handleAddJar(ev: React.FormEvent) {
+    ev.preventDefault()
+    const targetValue = parseFloat(jarForm.targetValue.replace(',', '.'))
+    if (!jarForm.name || isNaN(targetValue) || targetValue <= 0) {
+      showErrorToast('Preencha nome e meta (maior que zero) da caixinha.')
+      return
+    }
+    addSavingsJar({ name: jarForm.name, targetValue, savedValue: 0, createdAt: new Date().toISOString() })
+    showSuccessToast(`Caixinha "${jarForm.name}" criada.`)
+    setJarForm({ name: '', targetValue: '' })
+    setShowJarForm(false)
+  }
+
+  function openEditJar(id: string, currentSaved: number) {
+    setEditingJarId(id)
+    setEditJarAmount(String(currentSaved))
+  }
+
+  function handleSaveJarAmount(id: string) {
+    const v = parseFloat(editJarAmount.replace(',', '.'))
+    if (isNaN(v) || v < 0) {
+      showErrorToast('Valor inválido.')
+      return
+    }
+    updateSavingsJar(id, { savedValue: v })
+    showSuccessToast('Valor guardado atualizado.')
+    setEditingJarId(null)
+  }
 
   return (
     <div className="space-y-4">
@@ -143,6 +178,88 @@ export default function Configuracoes() {
         >
           + Confirmar nova recarga ({fmt(benefitCardMonthlyAmount)})
         </button>
+      </div>
+
+      {/* Caixinhas */}
+      <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-[13px] text-slate-100 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(217,70,239,0.2)' }}>
+              <IconPigMoney size={14} color="#f0abfc" />
+            </span>
+            Caixinhas
+          </h2>
+          <button
+            onClick={() => setShowJarForm(!showJarForm)}
+            className="text-xs bg-fuchsia-700 hover:bg-fuchsia-600 px-3 py-1.5 rounded-full font-medium"
+          >
+            {showJarForm ? 'Cancelar' : '+ Nova caixinha'}
+          </button>
+        </div>
+
+        {showJarForm && (
+          <form onSubmit={handleAddJar} className="bg-slate-800 rounded-2xl p-3 mb-3 space-y-2">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Nome (ex: Carro, Viagem...)</label>
+              <input
+                value={jarForm.name}
+                onChange={(e) => setJarForm((f) => ({ ...f, name: e.target.value }))}
+                className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Meta (R$)</label>
+              <input
+                type="number"
+                value={jarForm.targetValue}
+                onChange={(e) => setJarForm((f) => ({ ...f, targetValue: e.target.value }))}
+                className="w-full bg-slate-600 rounded px-2 py-1.5 text-sm text-slate-200"
+              />
+            </div>
+            <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 py-2 rounded-full text-sm font-medium">
+              Criar caixinha
+            </button>
+          </form>
+        )}
+
+        <div className="space-y-2">
+          {(savingsJars ?? []).length === 0 && (
+            <p className="text-slate-500 text-sm text-center py-3">Nenhuma caixinha criada ainda.</p>
+          )}
+          {(savingsJars ?? []).map((jar) => {
+            const pct = jar.targetValue > 0 ? Math.min(100, Math.max(0, (jar.savedValue / jar.targetValue) * 100)) : 0
+            return (
+              <div key={jar.id} className="bg-slate-800 rounded-2xl px-3 py-2.5">
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="text-sm text-slate-200">{jar.name}</div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-fuchsia-400 font-medium text-sm">{fmt(jar.savedValue)} <span className="text-slate-500 font-normal">de {fmt(jar.targetValue)}</span></span>
+                    <button onClick={() => openEditJar(jar.id, jar.savedValue)} className="text-slate-500 hover:text-blue-400" title="Editar valor guardado"><IconPencil size={13} /></button>
+                    <button onClick={() => { if (confirm(`Remover a caixinha "${jar.name}"?`)) { removeSavingsJar(jar.id); showSuccessToast('Caixinha removida.') } }} className="text-slate-500 hover:text-red-400"><IconX size={13} /></button>
+                  </div>
+                </div>
+                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #d946ef, #f0abfc)' }} />
+                </div>
+                {editingJarId === jar.id && (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="number"
+                      value={editJarAmount}
+                      onChange={(e) => setEditJarAmount(e.target.value)}
+                      autoFocus
+                      className="flex-1 bg-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 border border-slate-600"
+                      placeholder="Novo valor guardado (R$)"
+                    />
+                    <button onClick={() => handleSaveJarAmount(jar.id)} className="bg-fuchsia-600 hover:bg-fuchsia-500 px-3 py-1.5 rounded-full text-sm font-medium">
+                      Salvar
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Meta de gastos */}

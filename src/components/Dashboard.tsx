@@ -13,7 +13,7 @@ import {
 const COLORS = ['#7c3aed', '#d946ef', '#f97316', '#06b6d4']
 
 export default function Dashboard() {
-  const { expenses, budgets, investments, investmentRecords, aportes, annualGoal, incomeReceipts, extraordinaryIncomes, hideSaldo, toggleHideSaldo } = useStore()
+  const { expenses, budgets, investments, investmentRecords, aportes, annualGoal, incomeReceipts, extraordinaryIncomes, hideSaldo, toggleHideSaldo, savingsJars } = useStore()
 
   const month = currentMonth()
   const budget = [...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]
@@ -105,9 +105,8 @@ export default function Dashboard() {
     streakCursor = addMonths(streakCursor, -1)
   }
 
-  const ringR = 49
-  const ringC = 2 * Math.PI * ringR
-  const ringOffset = ringC - (Math.min(100, Math.max(0, goalPct)) / 100) * ringC
+  const jarRingR = 26
+  const jarRingC = 2 * Math.PI * jarRingR
 
   return (
     <div className="space-y-4">
@@ -136,20 +135,35 @@ export default function Dashboard() {
         </div>
         <div className="relative text-center text-[11px] text-white/70 mt-1">rendas − gastos − aportes</div>
 
-        <div className="relative flex justify-center my-4">
-          <svg width={128} height={128} viewBox="0 0 128 128">
-            <circle cx={64} cy={64} r={ringR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={10} />
-            <circle
-              cx={64} cy={64} r={ringR} fill="none" stroke="#fff" strokeWidth={10} strokeLinecap="round"
-              strokeDasharray={ringC} strokeDashoffset={ringOffset} transform="rotate(-90 64 64)"
-            />
-            <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 22 }}>
-              {goalPct.toFixed(0)}%
-            </text>
-            <text x="50%" y="63%" textAnchor="middle" dominantBaseline="central" className="fill-white/80 font-medium" style={{ fontSize: 10 }}>
-              da missão
-            </text>
-          </svg>
+        <div className="relative my-4">
+          <div className="text-center text-[11px] font-bold text-white/85 mb-2">Caixinhas</div>
+          {(savingsJars ?? []).length === 0 ? (
+            <div className="text-center text-[11px] text-white/70 px-6">
+              Crie sua primeira caixinha em Config para guardar dinheiro pra algo (carro, viagem...).
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
+              {(savingsJars ?? []).map((jar) => {
+                const pct = jar.targetValue > 0 ? Math.min(100, Math.max(0, (jar.savedValue / jar.targetValue) * 100)) : 0
+                const offset = jarRingC - (pct / 100) * jarRingC
+                return (
+                  <div key={jar.id} className="flex flex-col items-center flex-shrink-0" style={{ width: 72 }}>
+                    <svg width={64} height={64} viewBox="0 0 64 64">
+                      <circle cx={32} cy={32} r={jarRingR} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={6} />
+                      <circle
+                        cx={32} cy={32} r={jarRingR} fill="none" stroke="#fff" strokeWidth={6} strokeLinecap="round"
+                        strokeDasharray={jarRingC} strokeDashoffset={offset} transform="rotate(-90 32 32)"
+                      />
+                      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-white font-extrabold" style={{ fontSize: 13 }}>
+                        {pct.toFixed(0)}%
+                      </text>
+                    </svg>
+                    <span className="text-[10px] text-white/85 font-medium text-center truncate w-full mt-1">{jar.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {streakMonths > 0 && (
