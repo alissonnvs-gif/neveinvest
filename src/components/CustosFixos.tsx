@@ -75,17 +75,36 @@ export default function CustosFixos() {
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10)
     const thisMonth = currentMonth()
+
+    // Migração: registros de pagamento de custo fixo no cartão criados ANTES desse fix gravaram o
+    // mês calendário (não o mês da fatura). Realinha pro mês real do gasto vinculado (fonte da
+    // verdade, nunca teve esse problema) — sem isso, a Projeção não reconhece o pagamento antigo e
+    // soma o custo de novo, duplicando o valor.
+    const live = useStore.getState()
+    const costById = new Map(live.fixedCosts.map((c) => [c.id, c]))
+    const corrections = live.fixedCostPayments.reduce<Record<string, string>>((acc, p) => {
+      const cost = costById.get(p.fixedCostId)
+      if (!cost || !CARD_METHODS.includes(cost.defaultMethod as any)) return acc
+      const exp = live.expenses.find((e) => e.id === p.expenseId)
+      if (exp && exp.month !== p.month) acc[p.id] = exp.month
+      return acc
+    }, {})
+    if (Object.keys(corrections).length > 0) {
+      useStore.setState((s) => ({
+        fixedCostPayments: s.fixedCostPayments.map((p) => (corrections[p.id] ? { ...p, month: corrections[p.id] } : p)),
+      }))
+    }
+
     fixedCosts.forEach((cost) => {
       if (!CARD_METHODS.includes(cost.defaultMethod as any)) return
       if (!isActiveInMonth(cost, thisMonth)) return
       const card = cardIdFromMethod(cost.defaultMethod)
       const expMonth = getFaturaMonth(today, card)
-      // Lê o estado ao vivo (não o snapshot do render) pra não duplicar em re-execuções do efeito
-      // (ex: StrictMode em dev, que roda efeitos duas vezes de propósito). Checa pela data real de
-      // criação (paidAt), não pelo campo `month` — esse agora guarda o mês da FATURA (igual a
-      // Expense.month, pra Projeção e Faturas de cartão baterem certo), que pode ser diferente do
-      // mês calendário atual dependendo do dia de fechamento do cartão.
-      const alreadyGenerated = useStore.getState().fixedCostPayments.some((p) => p.fixedCostId === cost.id && p.paidAt.slice(0, 7) === thisMonth)
+      // Lê o estado ao vivo (já com a correção da migração acima aplicada) pra não duplicar em
+      // re-execuções do efeito (ex: StrictMode em dev). Checa pelo mês da FATURA (igual a
+      // Expense.month), não pelo mês calendário — perto do dia de fechamento, duas rodadas em
+      // calendários diferentes podem cair na MESMA fatura, e isso não pode gerar cobrança em dobro.
+      const alreadyGenerated = useStore.getState().fixedCostPayments.some((p) => p.fixedCostId === cost.id && p.month === expMonth)
       if (alreadyGenerated) return
       const expId = crypto.randomUUID()
       addExpense({
