@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { fmt, currentMonth, monthLabel, addMonths, getFaturaMonth, CARDS, CARD_METHODS, cardMethod, faturaMethod, cardIdFromMethod, faturaOpenAmount, getFaturaLancamentos } from '../utils'
 import type { CardId } from '../config/cards'
@@ -192,6 +192,13 @@ export default function CustosFixos() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [payingCost, setPayingCost] = useState<FixedCost | null>(null)
   const [activeSection, setActiveSection] = useState<'checklist' | 'gerenciar' | 'projecao'>('checklist')
+
+  // Rola até o formulário sozinho quando ele abre (tanto pelo "+ Novo" quanto pelo "Editar"),
+  // pra não precisar rolar a página manualmente pra achar os campos.
+  const formRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [showForm])
 
   const emptyForm = {
     description: '',
@@ -687,7 +694,7 @@ export default function CustosFixos() {
 
           {/* Formulário de cadastro/edição */}
           {showForm && (
-            <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
+            <div ref={formRef} className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
               <h2 className="font-bold text-[13px] text-slate-100 mb-3">
                 {editingId ? 'Editar custo fixo' : 'Novo custo fixo'}
               </h2>
