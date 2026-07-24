@@ -90,6 +90,17 @@ export function weeklyBuckets(items: { date: string; amount: number }[]): [numbe
   return buckets
 }
 
+// Lançamentos individuais (compras) que compõem a fatura de um cartão em determinado mês —
+// única fonte de verdade para essa consulta, usada em Dashboard/Gastos/CustosFixos (evita
+// reimplementações locais divergentes do mesmo filtro+ordenação).
+export function getFaturaLancamentos<T extends { method: string; month: string; date: string }>(
+  expenses: T[], card: CardId, month: string
+): T[] {
+  return expenses
+    .filter((e) => e.method === cardMethod(card) && e.month === month)
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
 export function faturaOpenAmount(expenses: { method: string; month: string; amount: number }[], card: CardId, month: string): number {
   const method = cardMethod(card)
   const payMethod = faturaMethod(card)

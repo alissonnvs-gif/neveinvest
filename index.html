@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NeveInvest</title>
+    <meta name="theme-color" content="#160f30" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -11,7 +15,29 @@
           extend: {
             colors: {
               brand: '#10b981',
-            }
+              slate: {
+                50: '#f6f5fb',
+                100: '#eeecf8',
+                200: '#dbd6f0',
+                300: '#bcb2e2',
+                400: '#9689c9',
+                500: '#7566ab',
+                600: '#584d85',
+                700: '#413764',
+                800: '#292144',
+                900: '#18132e',
+                950: '#0d0a1c',
+              },
+            },
+            borderRadius: {
+              lg: '0.875rem',
+              xl: '1.25rem',
+              '2xl': '1.5rem',
+              '3xl': '1.75rem',
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            },
           }
         }
       }

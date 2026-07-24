@@ -1,17 +1,19 @@
+import type { ReactNode, CSSProperties } from 'react'
 import { useStore } from '../store'
 import InsightsCard from './InsightsCard'
 import CardSpendGoal from './CardSpendGoal'
-import { fmt, fmtPct, currentMonth, monthLabel, CDI_MONTHLY, POUPANCA_MONTHLY, monthsRemaining, computeSaldo, computeBenefitBalance, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
+import { fmt, currentMonth, monthLabel, addMonths, CDI_MONTHLY, monthsRemaining, computeSaldo, CARD_SPEND_METHODS, CARDS, cardMethod, nextFaturaMonth, overdueFaturaMonth, faturaOpenAmount, weeklyBuckets } from '../utils'
+import { supabase } from '../lib/supabase'
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import {
-  AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, ComposedChart,
-  LineChart, ReferenceLine, Legend,
-} from 'recharts'
+  IconBuildingBank, IconLogout, IconFlame, IconReceipt, IconCreditCard,
+  IconTrendingUp, IconEye, IconEyeOff, IconStar, IconFlag2, IconPigMoney,
+} from '@tabler/icons-react'
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6']
+const COLORS = ['#7c3aed', '#d946ef', '#f97316', '#06b6d4']
 
 export default function Dashboard() {
-  const { expenses, budgets, investments, investmentRecords, aportes, annualGoal, incomeReceipts, extraordinaryIncomes, hideSaldo, toggleHideSaldo, benefitCardMonthlyAmount, benefitCardCredits } = useStore()
+  const { expenses, budgets, investments, investmentRecords, aportes, annualGoal, incomeReceipts, extraordinaryIncomes, hideSaldo, toggleHideSaldo, savingsJars } = useStore()
 
   const month = currentMonth()
   const budget = [...budgets].sort((a, b) => b.month.localeCompare(a.month))[0]
@@ -33,21 +35,9 @@ export default function Dashboard() {
   const cardFaturas = cardOpenFaturas.map(({ card, month }) => ({
     card,
     month,
-    amount: Math.max(0,
-      expenses.filter((e) => e.method === cardMethod(card.id) && e.month === month).reduce((s, e) => s + e.amount, 0)
-      - expenses.filter((e) => e.method === `fatura_${card.id}` && e.month === month).reduce((s, e) => s + e.amount, 0)
-    ),
+    amount: faturaOpenAmount(expenses, card.id, month),
   }))
   const cardSpent = cardFaturas.reduce((s, f) => s + f.amount, 0)
-
-  // Cartão Benefício — saldo contínuo (recarrega e debita, sem fechamento/vencimento mensal)
-  const hasBenefitHistory = (benefitCardCredits ?? []).length > 0
-  const benefitBalance = computeBenefitBalance({ benefitCardCredits: benefitCardCredits ?? [], expenses })
-  const benefitSpentThisMonth = expenses
-    .filter((e) => e.method === 'cartao_beneficio' && e.date.slice(0, 7) === month)
-    .reduce((s, e) => s + e.amount, 0)
-  // Medidor: saldo atual como fração de uma recarga mensal (não é "% usado", é "quanto sobrou")
-  const benefitPct = benefitCardMonthlyAmount > 0 ? Math.max(0, Math.min((benefitBalance / benefitCardMonthlyAmount) * 100, 100)) : 0
 
   // Meta de gastos: mesmo valor das faturas exibidas (líquido de pagamentos)
   const cardSpentOpen = cardSpent
@@ -55,7 +45,7 @@ export default function Dashboard() {
     expenses.filter((e) => cardFaturas.some((f) => e.method === cardMethod(f.card.id) && e.month === f.month))
   )
   const saldo = computeSaldo({ incomeReceipts: incomeReceipts ?? [], extraordinaryIncomes: extraordinaryIncomes ?? [], expenses, aportes: aportes ?? [] })
-  const limit = budget?.limit ?? 8000
+  const limit = budget?.limit || 8000
 
   const totalInvested = investments.reduce((s, i) => s + i.currentValue, 0)
   const target = annualGoal.targetValue
@@ -79,45 +69,10 @@ export default function Dashboard() {
     ? last6Aportes.reduce((s, a) => s + a.amount, 0) / last6Aportes.length
     : 0
   const projectedValue = totalInvested + (avgMonthlyAporte + avgMonthlyReturn) * months
-  const projectedPct = target > 0 ? Math.min((projectedValue / target) * 100, 100) : 0
 
-  // Jornada mensal da carteira (histórico real + projeção futura + benchmarks CDI/Poupança)
-  const allMonths = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(annualGoal.year, 0 + i, 1)
-    return d.toISOString().slice(0, 7)
-  })
-  const recordsByMonth = new Map<string, number>()
-  allMonths.forEach((m) => {
-    const recs = investmentRecords.filter((r) => r.month === m)
-    if (recs.length > 0) {
-      recordsByMonth.set(m, recs.reduce((s, r) => s + r.currentValue, 0))
-    }
-  })
-
-  // Base para CDI/Poupança: valor inicial da carteira em jan/2026
-  const baseValue = investments.reduce((s, i) => s + i.initialValue, 0) || totalInvested
-  const currentMonthIdx = allMonths.indexOf(month)
-
-  const journeyData = allMonths.map((m, idx) => {
-    const isFuture = m > month
-    const isCurrent = m === month
-    const recorded = recordsByMonth.get(m)
-    const valor = isCurrent ? totalInvested : (!isFuture && recorded) ? recorded : (isCurrent ? totalInvested : null)
-
-    // Benchmarks compostos desde janeiro
-    const cdi = baseValue * Math.pow(1 + CDI_MONTHLY, idx + 1)
-    const poupanca = baseValue * Math.pow(1 + POUPANCA_MONTHLY, idx + 1)
-
-    return {
-      name: monthLabel(m).slice(0, 3),
-      valor: isFuture ? null : valor,
-      projecao: isFuture
-        ? totalInvested + (avgMonthlyAporte + avgMonthlyReturn) * (idx - currentMonthIdx)
-        : (isCurrent ? totalInvested : null),
-      cdi: idx <= currentMonthIdx ? cdi : null,
-      poupanca: idx <= currentMonthIdx ? poupanca : null,
-    }
-  })
+  // Passos da jornada até a meta (visual simplificado tipo "fases")
+  const journeySteps = [25, 50, 75, 100].map((pct) => ({ pct, reached: goalPct >= pct }))
+  const currentStepIdx = journeySteps.filter((s) => s.reached).length
 
   // Gastos no cartão por semana — acompanha a fatura aberta de cada cartão, não o mês calendário:
   // mostra os gastos feitos até agora que caem na fatura que vai vencer em breve.
@@ -141,289 +96,248 @@ export default function Dashboard() {
     value: monthExpenses.filter((e) => e.method === method).reduce((s, e) => s + e.amount, 0),
   })).filter((d) => d.value > 0)
 
-  // Marcos da meta
-  const milestones = [
-    { pct: 25, label: '25%', value: target * 0.25 },
-    { pct: 50, label: '50%', value: target * 0.50 },
-    { pct: 75, label: '75%', value: target * 0.75 },
-    { pct: 100, label: '🏁', value: target },
-  ]
+  // Sequência de meses consecutivos com pelo menos um aporte registrado (mês atual pra trás)
+  const monthsWithAporte = new Set((aportes ?? []).map((a) => a.date.slice(0, 7)))
+  let streakMonths = 0
+  let streakCursor = month
+  while (monthsWithAporte.has(streakCursor)) {
+    streakMonths++
+    streakCursor = addMonths(streakCursor, -1)
+  }
 
   return (
-    <div className="space-y-5">
-      {/* Cards de resumo rápido */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-slate-800 rounded-xl p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs text-slate-400">Saldo em Conta</span>
-            <button onClick={toggleHideSaldo} className="text-slate-500 hover:text-slate-300 transition-colors text-xs" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
-              {hideSaldo ? '👁️' : '🙈'}
-            </button>
+    <div className="space-y-4">
+      {/* Cabeçalho colorido com onda */}
+      <div className="relative -mx-4 px-4 pt-4 overflow-hidden" style={{ background: 'linear-gradient(160deg, #7c3aed, #d946ef 55%, #f97316)' }}>
+        <div className="relative flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <IconBuildingBank size={17} color="#fff" />
+            </span>
+            <span className="font-bold text-sm text-white">NeveInvest</span>
           </div>
-          <div className={`text-lg font-bold ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {hideSaldo ? '••••••' : fmt(saldo)}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">rendas − gastos − aportes</div>
-        </div>
-        <Card label="Gasto efetivo" value={fmt(totalSpent)} sub="pix · boleto · faturas" color="yellow" />
-        <Card label="Gastos no Cartão" value={fmt(cardSpent)} sub={`meta ${fmt(limit)}`} color="purple" />
-        <Card label="Carteira total" value={fmt(totalInvested)} sub={`${goalPct.toFixed(1)}% da meta`} color="blue" />
-      </div>
-
-      {/* ── INSIGHTS DO DIA ── */}
-      <InsightsCard />
-
-      {/* ── MISSÃO: META R$500k ── */}
-      <div className="bg-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-1">
-          <div>
-            <h2 className="font-bold text-base text-slate-100">🎯 Missão: {fmt(target)} até Dez/{annualGoal.year}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Cada mês conta. Todo aporte te aproxima.</p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-black text-emerald-400">{goalPct.toFixed(1)}%</div>
-            <div className="text-xs text-slate-400">concluído</div>
-          </div>
+          <button onClick={() => supabase.auth.signOut()} className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white/90" title="Sair">
+            <IconLogout size={15} />
+          </button>
         </div>
 
-        {/* Barra principal */}
-        <div className="mt-4 mb-2">
-          <div className="relative h-7 bg-slate-700 rounded-full overflow-visible">
-            {/* Marcos */}
-            {milestones.map((m) => (
-              <div
-                key={m.pct}
-                className="absolute top-0 h-full flex flex-col items-center"
-                style={{ left: `${m.pct}%`, transform: 'translateX(-50%)' }}
-              >
-                <div className={`h-full w-px ${goalPct >= m.pct ? 'bg-emerald-600' : 'bg-slate-600'}`} />
-              </div>
-            ))}
-            {/* Barra de progresso atual */}
-            <div
-              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-700 relative"
-              style={{ width: `${goalPct}%` }}
-            >
-              {goalPct > 5 && (
-                <span className="absolute right-2 top-0 h-full flex items-center text-xs font-bold text-white">
-                  {fmt(totalInvested)}
-                </span>
-              )}
+        <div className="relative flex items-center justify-center gap-2 mb-1">
+          <span className="text-xs font-bold text-white/85">Saldo em conta</span>
+          <button onClick={toggleHideSaldo} className="text-white/70 hover:text-white transition-colors" title={hideSaldo ? 'Mostrar' : 'Ocultar'}>
+            {hideSaldo ? <IconEye size={13} /> : <IconEyeOff size={13} />}
+          </button>
+        </div>
+        <div className="relative text-center text-4xl font-extrabold text-white tracking-tight">
+          {hideSaldo ? '••••••' : fmt(saldo)}
+        </div>
+        <div className="relative text-center text-[11px] text-white/70 mt-1">rendas − gastos − aportes</div>
+
+        <div className="relative my-4">
+          <div className="text-center text-[11px] font-bold text-white/85 mb-2">Caixinhas</div>
+          {(savingsJars ?? []).length === 0 ? (
+            <div className="text-center text-[11px] text-white/70 px-6">
+              Crie sua primeira caixinha em Config para guardar dinheiro pra algo (carro, viagem...).
             </div>
-            {/* Barra de projeção */}
-            {projectedPct > goalPct && (
-              <div
-                className="absolute top-0 h-full bg-blue-500/30 rounded-r-full transition-all duration-700"
-                style={{ left: `${goalPct}%`, width: `${Math.min(projectedPct - goalPct, 100 - goalPct)}%` }}
-              />
-            )}
-          </div>
-
-          {/* Labels dos marcos */}
-          <div className="relative h-5 mt-1">
-            {milestones.map((m) => (
-              <div
-                key={m.pct}
-                className="absolute flex flex-col items-center"
-                style={{ left: `${m.pct}%`, transform: 'translateX(-50%)' }}
-              >
-                <span className={`text-xs ${goalPct >= m.pct ? 'text-emerald-400 font-semibold' : 'text-slate-600'}`}>
-                  {m.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Faltam / Projeção */}
-        <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
-          <div className="bg-slate-700/60 rounded-lg px-3 py-2">
-            <div className="text-xs text-slate-400 mb-0.5">Faltam</div>
-            <div className="font-bold text-slate-100">{fmt(Math.max(0, target - totalInvested))}</div>
-          </div>
-          <div className="bg-blue-900/30 border border-blue-800/50 rounded-lg px-3 py-2">
-            <div className="text-xs text-blue-400 mb-0.5 flex items-center gap-1">
-              Projeção (ritmo atual)
-              <InfoTooltip text={`Carteira atual (${fmt(totalInvested)}) + rendimento médio mensal dos últimos 6 meses (${fmt(avgMonthlyReturn)}) + aporte médio dos últimos 6 meses (${fmt(avgMonthlyAporte)}), projetados pelos ${months} meses restantes até dezembro/2026. Se não há histórico, usa CDI como rendimento estimado e R$ 0 de aporte.`} />
+          ) : (
+            <div className="flex gap-2.5 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
+              {(savingsJars ?? []).map((jar) => (
+                <div key={jar.id} className="flex flex-col items-center flex-shrink-0 bg-white/15 rounded-2xl px-3 py-2.5" style={{ minWidth: 84 }}>
+                  <IconPigMoney size={18} color="#fff" />
+                  <span className="text-sm font-extrabold text-white mt-1 whitespace-nowrap">{fmt(jar.savedValue)}</span>
+                  <span className="text-[10px] text-white/80 font-medium text-center truncate w-full">{jar.name}</span>
+                </div>
+              ))}
             </div>
-            <div className="font-bold text-blue-300">{fmt(projectedValue)}</div>
-          </div>
+          )}
         </div>
 
-        {/* Aportes necessários */}
-        <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
-          <div className="bg-emerald-900/30 border border-emerald-800/40 rounded-lg px-3 py-2">
-            <div className="text-slate-400 mb-0.5">Aporte/mês c/ rec. extraordinária</div>
-            <div className="text-emerald-400 font-bold text-sm">{fmt(monthlyNeeded)}</div>
-          </div>
-          <div className="bg-slate-700/60 rounded-lg px-3 py-2">
-            <div className="text-slate-400 mb-0.5">Aporte/mês só renda fixa</div>
-            <div className="text-red-400 font-bold text-sm">{fmt(monthlyNeededNoExtra)}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Jornada anual — carteira mês a mês */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-200">📈 Jornada 2026 — Carteira mês a mês</h2>
-        </div>
-        {/* Legenda */}
-        <div className="flex flex-wrap gap-3 mb-3 text-xs text-slate-400">
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />Carteira real</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-blue-400 rounded border-dashed" style={{borderTop:'2px dashed #60a5fa', background:'none'}} />Projeção</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-amber-400 rounded" />CDI</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-slate-400 rounded" />Poupança</span>
-        </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart data={journeyData}>
-            <defs>
-              <linearGradient id="gradVal" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-            <Tooltip
-              formatter={(v, name) => {
-                const labels: Record<string, string> = { valor: 'Carteira', projecao: 'Projeção', cdi: 'CDI', poupanca: 'Poupança' }
-                return [fmt(v as number), labels[name as string] ?? name]
-              }}
-              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-            />
-            <Area type="monotone" dataKey="valor" stroke="#10b981" fill="url(#gradVal)" strokeWidth={2.5} name="valor" connectNulls dot={false} />
-            <Line type="monotone" dataKey="projecao" stroke="#3b82f6" strokeDasharray="5 3" strokeWidth={1.5} name="projecao" connectNulls dot={false} />
-            <Line type="monotone" dataKey="cdi" stroke="#f59e0b" strokeWidth={1.5} name="cdi" connectNulls dot={false} strokeDasharray="3 2" />
-            <Line type="monotone" dataKey="poupanca" stroke="#94a3b8" strokeWidth={1.5} name="poupanca" connectNulls dot={false} strokeDasharray="2 3" />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Benchmarks */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-200">Referência mensal sobre {fmt(totalInvested)}</h2>
-        <div className="grid grid-cols-3 gap-3 text-center text-sm">
-          <BenchmarkCard label="CDI (10.75% aa)" value={fmt(totalInvested * CDI_MONTHLY)} pct={fmtPct(CDI_MONTHLY * 100)} />
-          <BenchmarkCard label="Poupança (6.17% aa)" value={fmt(totalInvested * POUPANCA_MONTHLY)} pct={fmtPct(POUPANCA_MONTHLY * 100)} />
-          <BenchmarkCard label="Aporte necessário" value={fmt(monthlyNeeded)} pct="/mês" />
-        </div>
-      </div>
-
-      {/* Aviso: fatura já fechada (não aceita mais compras) mas ainda não paga */}
-      {overdueCards.length > 0 && (
-        <div className="bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2 text-xs text-amber-300 space-y-1">
-          {overdueCards.map((o) => (
-            <div key={o.card.id}>⚠️ Fatura {o.card.label} de {monthLabel(o.month!)} fechada, aguardando pagamento — {fmt(o.amount)}</div>
-          ))}
-        </div>
-      )}
-
-      {/* Meta de gastos no cartão */}
-      <CardSpendGoal
-        spent={cardSpentOpen}
-        limit={limit}
-        weeklySpent={cardWeeklySpent}
-        monthLabelText={monthLabel(cardMonth)}
-      />
-
-      {/* Cartão Benefício — saldo contínuo, sem fechamento/vencimento */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-200">🎫 Cartão Benefício</h2>
-          <span className="text-xs text-slate-500">recarga de {fmt(benefitCardMonthlyAmount)}/mês</span>
-        </div>
-        {hasBenefitHistory ? (
-          <div>
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>Gasto em {monthLabel(month)}: <span className="text-teal-300 font-semibold">{fmt(benefitSpentThisMonth)}</span></span>
-              <span>Saldo atual: <span className={`font-semibold ${benefitBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(benefitBalance)}</span></span>
+        {streakMonths > 0 && (
+          <div className="relative flex justify-center mb-3">
+            <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1.5">
+              <IconFlame size={14} color="#fed7aa" />
+              <span className="text-[11px] font-bold text-white">
+                {streakMonths} {streakMonths === 1 ? 'mês seguido' : 'meses seguidos'} investindo
+              </span>
             </div>
-            <div className="h-2.5 bg-slate-700 rounded-full overflow-hidden mb-1">
-              <div
-                className={`h-full rounded-full transition-all ${benefitPct <= 15 ? 'bg-red-500' : benefitPct <= 40 ? 'bg-amber-500' : 'bg-teal-500'}`}
-                style={{ width: `${benefitPct}%` }}
-              />
-            </div>
-            <div className="text-xs text-slate-500 text-right">{benefitPct.toFixed(0)}% de uma recarga em saldo</div>
-          </div>
-        ) : (
-          <div className="text-center py-2">
-            <div className="text-slate-500 text-sm">Nenhuma recarga confirmada ainda</div>
-            <div className="text-xs text-slate-600 mt-0.5">Confirme na aba Gastos</div>
           </div>
         )}
+
+        <div className="h-16" />
+        <svg viewBox="0 0 320 74" className="absolute left-0 right-0 bottom-0 w-full block pointer-events-none" style={{ height: 74 }} preserveAspectRatio="none">
+          <path d="M0,8 C 70,8 95,58 175,52 C 255,47 260,4 320,10 L320,74 L0,74 Z" fill="#18132e" />
+        </svg>
       </div>
 
-      {/* Gastos por semana — fatura aberta (mesma referência do card de meta acima) */}
-      <div className="bg-slate-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-1 text-slate-200">Gastos no Cartão por semana — {monthLabel(cardMonth)}</h2>
-        <p className="text-xs text-slate-500 mb-3">{CARDS.map((c) => c.label).join(' + ')} · meta ÷ 4 ({fmt(limit / 4)}/semana)</p>
-        <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={weeklySpending}>
-            <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(1)}k`} domain={[0, Math.max(limit / 4 * 1.3, ...weeklySpending.map(w => w.gasto) )]} />
-            <Tooltip formatter={(v, name) => [fmt(v as number), name === 'gasto' ? 'Gasto' : 'Meta/semana']} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }} />
-            <Legend formatter={(v) => v === 'gasto' ? 'Gasto real' : 'Meta/semana'} wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
-            <ReferenceLine x={`Sem ${todayWeek}`} stroke="#60a5fa" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: 'Hoje', position: 'top', fill: '#60a5fa', fontSize: 10 }} />
-            <Line type="monotone" dataKey="meta" name="meta" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 3" dot={{ fill: '#f59e0b', r: 3 }} activeDot={{ r: 5 }} />
-            <Line type="monotone" dataKey="gasto" name="gasto" stroke="#10b981" strokeWidth={2.5} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Corpo com leve degradê sutil */}
+      <div className="-mx-4 px-4" style={{ background: 'linear-gradient(180deg, #18132e 0%, rgba(52,43,84,0.55) 28%, #18132e 100%)' }}>
+        <div className="space-y-4 pt-1">
 
-      {/* Distribuição por método */}
-      {byMethod.length > 0 && (
-        <div className="bg-slate-800 rounded-xl p-4">
-          <h2 className="font-semibold mb-3 text-slate-200">Distribuição por forma de pagamento</h2>
-          <div className="flex items-center">
-            <ResponsiveContainer width="50%" height={160}>
-              <PieChart>
-                <Pie data={byMethod} dataKey="value" cx="50%" cy="50%" outerRadius={60}>
-                  {byMethod.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-2">
-              {byMethod.map((d, i) => (
-                <div key={d.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                    <span className="text-slate-300">{d.name}</span>
+          {/* Chips de resumo */}
+          <div className="grid grid-cols-3 gap-3">
+            <StatChip icon={<IconReceipt size={15} color="#f0997b" />} tint="rgba(240,153,123,0.1)" border="rgba(240,153,123,0.25)" iconBg="rgba(240,153,123,0.2)" label="Gasto efetivo" value={fmt(totalSpent)} sub="pix·boleto·faturas" />
+            <StatChip icon={<IconCreditCard size={15} color="#ed93b1" />} tint="rgba(237,147,177,0.1)" border="rgba(237,147,177,0.25)" iconBg="rgba(237,147,177,0.2)" label="No cartão" value={fmt(cardSpent)} sub={`meta ${fmt(limit)}`} />
+            <StatChip icon={<IconTrendingUp size={15} color="#5dcaa5" />} tint="rgba(93,202,165,0.1)" border="rgba(93,202,165,0.25)" iconBg="rgba(93,202,165,0.2)" label="Carteira" value={fmt(totalInvested)} sub={`${goalPct.toFixed(1)}% da meta`} />
+          </div>
+
+          {/* Faltam / Projeção */}
+          <div className="rounded-3xl p-3.5" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
+            <div className="flex justify-between text-[11px] mb-2">
+              <span className="text-slate-300">Faltam pra meta</span>
+              <span className="font-bold text-slate-100">{fmt(Math.max(0, target - totalInvested))}</span>
+            </div>
+            <div className="flex justify-between text-[11px] mb-2">
+              <span className="text-slate-300 flex items-center gap-1">
+                Projeção (ritmo atual)
+                <InfoTooltip text={`Carteira atual (${fmt(totalInvested)}) + rendimento médio mensal dos últimos 6 meses (${fmt(avgMonthlyReturn)}) + aporte médio dos últimos 6 meses (${fmt(avgMonthlyAporte)}), projetados pelos ${months} meses restantes até dezembro/${annualGoal.year}. Se não há histórico, usa CDI como rendimento estimado e R$ 0 de aporte.`} />
+              </span>
+              <span className="font-bold text-fuchsia-300">{fmt(projectedValue)}</span>
+            </div>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-slate-300">Aporte/mês necessário</span>
+              <span className="font-bold text-emerald-300">{fmt(monthlyNeeded)}</span>
+            </div>
+          </div>
+
+          {/* ── INSIGHTS DO DIA ── */}
+          <InsightsCard />
+
+          {/* Jornada até a meta — caminho de fases */}
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
+            <h2 className="font-bold text-[13px] text-slate-100 mb-3">Sua jornada até a meta</h2>
+            <div className="relative" style={{ height: 46 }}>
+              <svg width="100%" height={46} viewBox="0 0 280 46" preserveAspectRatio="none" className="absolute top-2">
+                <path d="M10,10 Q70,40 140,20 T270,8" fill="none" stroke="#3d3659" strokeWidth={3} strokeLinecap="round" strokeDasharray="1 10" />
+              </svg>
+              {journeySteps.map((s, i) => {
+                const left = i === 0 ? '0%' : i === 1 ? '32%' : i === 2 ? '62%' : undefined
+                const isCurrent = i === currentStepIdx
+                const isLast = i === journeySteps.length - 1
+                const style: CSSProperties = isLast
+                  ? { right: 0, top: 0 }
+                  : { left, top: i === 1 ? 26 : i === 2 ? 10 : 4 }
+                return (
+                  <div
+                    key={s.pct}
+                    className="absolute rounded-full flex items-center justify-center"
+                    style={{
+                      ...style,
+                      width: isCurrent || isLast ? 22 : 18,
+                      height: isCurrent || isLast ? 22 : 18,
+                      border: '3px solid #18132e',
+                      background: s.reached ? '#5dcaa5' : isCurrent ? 'linear-gradient(135deg, #7c3aed, #d946ef)' : '#3d3659',
+                    }}
+                  >
+                    {isCurrent && !isLast && <IconStar size={10} color="#fff" />}
+                    {isLast && <IconFlag2 size={10} color={s.reached ? '#fff' : '#948bc7'} />}
                   </div>
-                  <span className="text-slate-200 font-medium">{fmt(d.value)}</span>
+                )
+              })}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-2">
+              {goalPct.toFixed(0)}% da meta — faltam {Math.max(0, 4 - currentStepIdx)} fases até {fmt(target)}
+            </div>
+          </div>
+
+          {/* Aviso: fatura já fechada (não aceita mais compras) mas ainda não paga */}
+          {overdueCards.length > 0 && (
+            <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl px-3 py-2 text-xs text-amber-300 space-y-1">
+              {overdueCards.map((o) => (
+                <div key={o.card.id}>Fatura {o.card.label} de {monthLabel(o.month!)} fechada, aguardando pagamento — {fmt(o.amount)}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Meta de gastos no cartão */}
+          <CardSpendGoal
+            spent={cardSpentOpen}
+            limit={limit}
+            weeklySpent={cardWeeklySpent}
+            monthLabelText={monthLabel(cardMonth)}
+          />
+
+          {/* Gastos por semana */}
+          <div className="rounded-3xl p-4" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.2)' }}>
+            <h2 className="font-bold text-[13px] text-slate-100 mb-1">Gastos no cartão por semana — {monthLabel(cardMonth)}</h2>
+            <p className="text-[11px] text-slate-400 mb-3">{CARDS.map((c) => c.label).join(' + ')} · meta ÷ 4 ({fmt(limit / 4)}/semana)</p>
+            <div className="flex items-end gap-2" style={{ height: 60 }}>
+              {weeklySpending.map((w, i) => {
+                const maxVal = Math.max(limit / 4, ...weeklySpending.map((x) => x.gasto), 1)
+                const heightPct = Math.max(6, (w.gasto / maxVal) * 100)
+                const isCurrent = i + 1 === todayWeek
+                return (
+                  <div key={w.name} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full rounded-t-lg" style={{
+                      height: `${heightPct}%`,
+                      background: isCurrent ? 'linear-gradient(180deg, #d946ef, #7c3aed)' : '#3d3659',
+                    }} />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex gap-2 mt-1">
+              {weeklySpending.map((w) => (
+                <div key={w.name} className="flex-1 text-center">
+                  <div className="text-[9px] text-slate-400">{w.name}</div>
+                  <div className="text-[10px] font-bold text-slate-200">{fmt(w.gasto)}</div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Distribuição por método */}
+          {byMethod.length > 0 && (
+            <div className="rounded-3xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
+              <h2 className="font-bold text-[13px] text-slate-100 mb-3">Distribuição por forma de pagamento</h2>
+              <div className="flex items-center">
+                <ResponsiveContainer width="50%" height={150}>
+                  <PieChart>
+                    <Pie data={byMethod} dataKey="value" cx="50%" cy="50%" outerRadius={55} innerRadius={30}>
+                      {byMethod.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: '#241e42', border: '1px solid #413764', borderRadius: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-2">
+                  {byMethod.map((d, i) => (
+                    <div key={d.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                        <span className="text-slate-300 text-xs">{d.name}</span>
+                      </div>
+                      <span className="text-slate-100 font-bold text-xs">{fmt(d.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
 
+        {/* Fecho da página — colina decorativa */}
+        <div className="relative -mx-4 mt-2">
+          <svg viewBox="0 0 320 60" className="w-full block" style={{ height: 60 }} preserveAspectRatio="none">
+            <path d="M0,60 L0,30 C 70,5 110,45 180,25 C 240,8 280,35 320,20 L320,60 Z" fill="#241e42" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-end pb-2.5">
+            <span className="w-8 h-8 rounded-full brand-gradient-bg flex items-center justify-center mb-1" style={{ boxShadow: '0 4px 14px rgba(217,70,239,0.4)' }}>
+              <IconFlag2 size={16} color="#fff" />
+            </span>
+            <span className="text-[10px] font-bold text-slate-200">Tudo em dia por aqui</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-function Card({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
-  const colors: Record<string, string> = {
-    green: 'text-emerald-400', red: 'text-red-400', blue: 'text-blue-400',
-    purple: 'text-purple-400', yellow: 'text-yellow-400',
-  }
+function StatChip({ icon, label, value, sub, tint, border, iconBg }: { icon: ReactNode; label: string; value: string; sub: string; tint: string; border: string; iconBg: string }) {
   return (
-    <div className="bg-slate-800 rounded-xl p-3">
-      <div className="text-xs text-slate-400 mb-1">{label}</div>
-      <div className={`text-lg font-bold ${colors[color]}`}>{value}</div>
-      <div className="text-xs text-slate-500 mt-1">{sub}</div>
-    </div>
-  )
-}
-
-function BenchmarkCard({ label, value, pct }: { label: string; value: string; pct: string }) {
-  return (
-    <div className="bg-slate-700 rounded-lg p-3">
-      <div className="text-xs text-slate-400 mb-1">{label}</div>
-      <div className="text-emerald-400 font-bold">{value}</div>
-      <div className="text-xs text-slate-400">{pct}</div>
+    <div className="rounded-[20px] p-3 flex flex-col items-center text-center gap-1" style={{ background: tint, border: `1px solid ${border}` }}>
+      <span className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: iconBg }}>{icon}</span>
+      <div className="text-[10px] text-slate-300 leading-tight">{label}</div>
+      <div className="text-xs font-bold text-slate-100 leading-tight">{value}</div>
+      <div className="text-[9px] text-slate-400 leading-tight">{sub}</div>
     </div>
   )
 }

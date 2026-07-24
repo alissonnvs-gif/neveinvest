@@ -15,9 +15,20 @@ import { supabase, loadFromSupabase, fetchPendingDraftsCount } from './lib/supab
 type Tab = 'dashboard' | 'gastos' | 'custos-fixos' | 'investimentos' | 'rascunhos' | 'configuracoes'
 
 const DRAFTS_POLL_MS = 15000
+const TAB_STORAGE_KEY = 'neveinvest-active-tab'
+const VALID_TABS: Tab[] = ['dashboard', 'gastos', 'custos-fixos', 'investimentos', 'rascunhos', 'configuracoes']
+
+function getStoredTab(): Tab {
+  const stored = localStorage.getItem(TAB_STORAGE_KEY)
+  return VALID_TABS.includes(stored as Tab) ? (stored as Tab) : 'dashboard'
+}
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('dashboard')
+  const [tab, setTabState] = useState<Tab>(getStoredTab)
+  const setTab = (t: Tab) => {
+    setTabState(t)
+    localStorage.setItem(TAB_STORAGE_KEY, t)
+  }
   const [draftsCount, setDraftsCount] = useState(0)
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const hydrate = useStore((s) => s.hydrate)

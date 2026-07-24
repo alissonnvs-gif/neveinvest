@@ -7,7 +7,7 @@ function buildPrompt(state: AppState): string {
   const today = now.toISOString().slice(0, 10)
 
   const budget = state.budgets.find((b) => b.month === month)
-  const limit = budget?.limit ?? 8000
+  const limit = budget?.limit || 8000
   const monthExpenses = state.expenses.filter((e) => e.month === month)
   const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0)
 

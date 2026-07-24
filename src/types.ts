@@ -118,6 +118,16 @@ export interface FixedCost {
   active: boolean
 }
 
+// Caixinha de dinheiro guardado para algo (carro, viagem etc) — não é uma meta com percentual,
+// só um valor guardado que sobe/desce por depósito e retirada manuais, sem ligação com
+// saldo/investimentos reais.
+export interface SavingsJar {
+  id: string
+  name: string
+  savedValue: number
+  createdAt: string // ISO date
+}
+
 export interface FixedCostPayment {
   id: string
   fixedCostId: string
@@ -156,4 +166,5 @@ export interface AppState {
   dailyInsights: DailyInsights | null
   benefitCardMonthlyAmount: number
   benefitCardCredits: BenefitCardCredit[]
+  savingsJars: SavingsJar[]
 }
