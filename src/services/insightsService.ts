@@ -101,7 +101,7 @@ export async function generateDailyInsights(state: AppState): Promise<DailyInsig
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'low' } },
       }),
     }
   )
