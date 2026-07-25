@@ -75,14 +75,36 @@ export default function CustosFixos() {
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10)
     const thisMonth = currentMonth()
+
+    // Migração: registros de pagamento de custo fixo no cartão criados ANTES desse fix gravaram o
+    // mês calendário (não o mês da fatura). Realinha pro mês real do gasto vinculado (fonte da
+    // verdade, nunca teve esse problema) — sem isso, a Projeção não reconhece o pagamento antigo e
+    // soma o custo de novo, duplicando o valor.
+    const live = useStore.getState()
+    const costById = new Map(live.fixedCosts.map((c) => [c.id, c]))
+    const corrections = live.fixedCostPayments.reduce<Record<string, string>>((acc, p) => {
+      const cost = costById.get(p.fixedCostId)
+      if (!cost || !CARD_METHODS.includes(cost.defaultMethod as any)) return acc
+      const exp = live.expenses.find((e) => e.id === p.expenseId)
+      if (exp && exp.month !== p.month) acc[p.id] = exp.month
+      return acc
+    }, {})
+    if (Object.keys(corrections).length > 0) {
+      useStore.setState((s) => ({
+        fixedCostPayments: s.fixedCostPayments.map((p) => (corrections[p.id] ? { ...p, month: corrections[p.id] } : p)),
+      }))
+    }
+
     fixedCosts.forEach((cost) => {
       if (!CARD_METHODS.includes(cost.defaultMethod as any)) return
       if (!isActiveInMonth(cost, thisMonth)) return
       const card = cardIdFromMethod(cost.defaultMethod)
       const expMonth = getFaturaMonth(today, card)
-      // Lê o estado ao vivo (não o snapshot do render) pra não duplicar em re-execuções do efeito
-      // (ex: StrictMode em dev, que roda efeitos duas vezes de propósito)
-      const alreadyGenerated = useStore.getState().fixedCostPayments.some((p) => p.fixedCostId === cost.id && p.month === thisMonth)
+      // Lê o estado ao vivo (já com a correção da migração acima aplicada) pra não duplicar em
+      // re-execuções do efeito (ex: StrictMode em dev). Checa pelo mês da FATURA (igual a
+      // Expense.month), não pelo mês calendário — perto do dia de fechamento, duas rodadas em
+      // calendários diferentes podem cair na MESMA fatura, e isso não pode gerar cobrança em dobro.
+      const alreadyGenerated = useStore.getState().fixedCostPayments.some((p) => p.fixedCostId === cost.id && p.month === expMonth)
       if (alreadyGenerated) return
       const expId = crypto.randomUUID()
       addExpense({
@@ -96,7 +118,7 @@ export default function CustosFixos() {
       } as any)
       addFixedCostPayment({
         fixedCostId: cost.id,
-        month: thisMonth,
+        month: expMonth,
         expenseId: expId,
         paidAt: new Date().toISOString(),
       })
@@ -230,14 +252,23 @@ export default function CustosFixos() {
   }
 
   const activeCosts = (fixedCosts ?? []).filter((c) => isActiveInMonth(c, selectedMonth))
+  // Só os custos fixos que NÃO são de cartão entram no total abaixo somando por custo individual —
+  // os de cartão já vêm embutidos no gasto real do cartão (totalCardGross), somar os dois contava
+  // o mesmo custo fixo de cartão duas vezes.
+  const nonCardActiveCosts = activeCosts.filter((c) => !CARD_METHODS.includes(c.defaultMethod as any))
 
   const totalFaturaAberta = CARDS.reduce((s, c) => s + getFaturaAberta(c.id, selectedMonth), 0)
-  const totalProjected = activeCosts.reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
-  const totalPaid = activeCosts.filter((c) => isPaid(c.id, selectedMonth)).reduce((s, c) => {
+  // Quanto já foi pago de fatura de cartão nesse mês (via "Pagar fatura") — separado do gasto em
+  // si, pra "pago"/"pendente" baterem certo com o cartão sem contar nada duas vezes.
+  const cardPaidThisMonth = CARDS.reduce((s, c) => s + expenses.filter((e) => e.method === faturaMethod(c.id) && e.month === selectedMonth).reduce((s2, e) => s2 + e.amount, 0), 0)
+  const totalCardGross = totalFaturaAberta + cardPaidThisMonth
+
+  const totalProjected = nonCardActiveCosts.reduce((s, c) => s + projectedAmount(c), 0) + totalCardGross
+  const totalPaid = nonCardActiveCosts.filter((c) => isPaid(c.id, selectedMonth)).reduce((s, c) => {
     const p = isPaid(c.id, selectedMonth)!
     return s + (expenses.find((e) => e.id === p.expenseId)?.amount ?? 0)
-  }, 0)
-  const totalPending = activeCosts.filter((c) => !isPaid(c.id, selectedMonth)).reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
+  }, 0) + cardPaidThisMonth
+  const totalPending = nonCardActiveCosts.filter((c) => !isPaid(c.id, selectedMonth)).reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
 
   function handleSave() {
     const amount = parseFloat(String(form.defaultAmount).replace(',', '.'))
@@ -990,10 +1021,13 @@ export default function CustosFixos() {
                 // dava a impressão de que era gasto a mais, além do que já aparece na fatura.
                 const nonCardActive = active.filter((c) => !CARD_METHODS.includes(c.defaultMethod as any))
                 const cardActive = active.filter((c) => CARD_METHODS.includes(c.defaultMethod as any))
+                // Valor real: se já existe um lançamento pra esse custo nesse mês, usa o valor real
+                // dele; senão usa o valor fixo cadastrado (nunca uma média/estimativa — a Projeção
+                // só deve mostrar o que já é certo: valor fixo combinado ou parcela já agendada).
                 const amountFor = (c: FixedCost) => {
                   const payment = isPaid(c.id, month)
                   const paidAmt = payment ? expenses.find((e) => e.id === payment.expenseId)?.amount : null
-                  return paidAmt ?? projectedAmount(c)
+                  return paidAmt ?? c.defaultAmount
                 }
                 const isPast = month < currentMonth()
                 const isCurrent = month === currentMonth()
@@ -1002,12 +1036,19 @@ export default function CustosFixos() {
                   return s + (expenses.find((e) => e.id === p.expenseId)?.amount ?? 0)
                 }, 0)
 
-                const cardTotals = CARDS.map((card) => ({
-                  card,
-                  amount: cardActive
-                    .filter((c) => cardIdFromMethod(c.defaultMethod) === card.id)
-                    .reduce((s, c) => s + amountFor(c), 0),
-                })).filter((f) => f.amount > 0)
+                // Fatura por cartão: soma todo gasto real já lançado nesse cartão nesse mês (custo
+                // fixo automático já gerado, parcelas já agendadas, compras avulsas) e completa com
+                // os custos fixos desse cartão que ainda não geraram lançamento real nesse mês
+                // (cobrança automática futura — entra pelo valor fixo cadastrado, nunca estimado).
+                const cardTotals = CARDS.map((card) => {
+                  const realTotal = expenses
+                    .filter((e) => e.method === cardMethod(card.id) && e.month === month)
+                    .reduce((s, e) => s + e.amount, 0)
+                  const missingCostsTotal = cardActive
+                    .filter((c) => cardIdFromMethod(c.defaultMethod) === card.id && !isPaid(c.id, month))
+                    .reduce((s, c) => s + c.defaultAmount, 0)
+                  return { card, amount: realTotal + missingCostsTotal }
+                }).filter((f) => f.amount > 0)
                 const nonCardTotal = nonCardActive.reduce((s, c) => s + amountFor(c), 0)
                 const totalWithFatura = nonCardTotal + cardTotals.reduce((s, f) => s + f.amount, 0)
                 return (
