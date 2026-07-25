@@ -252,14 +252,23 @@ export default function CustosFixos() {
   }
 
   const activeCosts = (fixedCosts ?? []).filter((c) => isActiveInMonth(c, selectedMonth))
+  // Só os custos fixos que NÃO são de cartão entram no total abaixo somando por custo individual —
+  // os de cartão já vêm embutidos no gasto real do cartão (totalCardGross), somar os dois contava
+  // o mesmo custo fixo de cartão duas vezes.
+  const nonCardActiveCosts = activeCosts.filter((c) => !CARD_METHODS.includes(c.defaultMethod as any))
 
   const totalFaturaAberta = CARDS.reduce((s, c) => s + getFaturaAberta(c.id, selectedMonth), 0)
-  const totalProjected = activeCosts.reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
-  const totalPaid = activeCosts.filter((c) => isPaid(c.id, selectedMonth)).reduce((s, c) => {
+  // Quanto já foi pago de fatura de cartão nesse mês (via "Pagar fatura") — separado do gasto em
+  // si, pra "pago"/"pendente" baterem certo com o cartão sem contar nada duas vezes.
+  const cardPaidThisMonth = CARDS.reduce((s, c) => s + expenses.filter((e) => e.method === faturaMethod(c.id) && e.month === selectedMonth).reduce((s2, e) => s2 + e.amount, 0), 0)
+  const totalCardGross = totalFaturaAberta + cardPaidThisMonth
+
+  const totalProjected = nonCardActiveCosts.reduce((s, c) => s + projectedAmount(c), 0) + totalCardGross
+  const totalPaid = nonCardActiveCosts.filter((c) => isPaid(c.id, selectedMonth)).reduce((s, c) => {
     const p = isPaid(c.id, selectedMonth)!
     return s + (expenses.find((e) => e.id === p.expenseId)?.amount ?? 0)
-  }, 0)
-  const totalPending = activeCosts.filter((c) => !isPaid(c.id, selectedMonth)).reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
+  }, 0) + cardPaidThisMonth
+  const totalPending = nonCardActiveCosts.filter((c) => !isPaid(c.id, selectedMonth)).reduce((s, c) => s + projectedAmount(c), 0) + totalFaturaAberta
 
   function handleSave() {
     const amount = parseFloat(String(form.defaultAmount).replace(',', '.'))
