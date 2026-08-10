@@ -1,0 +1,52 @@
+﻿# Mantem o projeto Supabase acordado.
+#
+# O plano gratuito do Supabase pausa qualquer projeto que fique 7 dias sem
+# receber requisicao. Quando isso acontece o login do app para de funcionar e
+# a tela mostra "E-mail ou senha invalidos", que nao tem nada a ver com o
+# problema real. Esta rotina faz uma consulta minima a cada 3 dias, entao o
+# projeto nunca chega nos 7 dias de silencio.
+#
+# A chave abaixo e a chave PUBLICA (anon). Ela ja fica visivel dentro do
+# JavaScript do site publicado, entao nao ha nada de secreto nela. A protecao
+# real dos dados vem das politicas de acesso (RLS) do banco, nao dela.
+
+name: Manter Supabase acordado
+
+on:
+  schedule:
+    - cron: '0 12 */3 * *'   # a cada 3 dias, 12:00 UTC (09:00 no horario de Brasilia)
+  workflow_dispatch:          # permite rodar na mao pelo site do GitHub
+
+jobs:
+  acordar:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://ogijczyxnklzqrwxzbvp.supabase.co
+      SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9naWpjenl4bmtsenFyd3h6YnZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODcxNDEsImV4cCI6MjA5OTk2MzE0MX0.fLTUotnAoPua0sL7ArVv84pf-xcpAiYpCrqdOfHh9Bo
+    steps:
+      - name: Consultar o banco
+        run: |
+          echo "Consultando $SUPABASE_URL ..."
+          codigo=$(curl -sS -o /tmp/resposta -w '%{http_code}' \
+            --max-time 30 \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/family_state?select=id&limit=1") || codigo="sem_resposta"
+
+          echo "Resposta HTTP: $codigo"
+          echo "Corpo: $(cat /tmp/resposta 2>/dev/null | head -c 300)"
+
+          {
+            echo "### Ping no Supabase"
+            echo ""
+            echo "- Quando: $(date -u '+%d/%m/%Y %H:%M UTC')"
+            echo "- Resposta: \`$codigo\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$codigo" != "200" ]; then
+            echo "::error::O Supabase respondeu '$codigo' em vez de 200. O projeto pode estar pausado ou a chave pode ter sido trocada. Abra https://supabase.com/dashboard e confira."
+            exit 1
+          fi
+
+          echo "Projeto acordado com sucesso."
+
